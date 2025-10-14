@@ -1,19 +1,52 @@
 # kis_build_system/CMakeLists.txt
-#
-# This file's primary purpose is to be included by other KIS SDK packages
-# when they are being built in standalone mode. It provides the path to the
-# shared CMake modules.
 
 cmake_minimum_required(VERSION 3.20)
-project(kis_build_system)
+include(kis.package.cmake)
+project(${PACKAGE_NAME} VERSION ${PACKAGE_VERSION})
 
-# Set variables in the PARENT_SCOPE so the including project can use them.
-# This is the crucial mechanism for sharing the build system logic.
+# --- Installation Logic ---
+# This package's "product" is a set of CMake scripts and a config file
+# that allows other projects to use them via find_package().
 
-# 1. Provide the path to the directory containing all the *.cmake helper modules.
-set(KIS_BUILD_SYSTEM_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/build_system" PARENT_SCOPE)
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
 
-# 2. Provide the full path to the generic config template for the packaging module.
-set(KIS_GENERIC_CONFIG_TEMPLATE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/templates/GenericPackageConfig.cmake.in" PARENT_SCOPE)
+# 1. Define where the CMake modules will be installed.
+set(INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
-message(STATUS "kis_build_system included, providing module path: ${KIS_BUILD_SYSTEM_MODULE_PATH}")
+# 2. Install all the CMake script files and templates.
+install(
+    DIRECTORY modules/ templates/
+    DESTINATION ${INSTALL_CMAKEDIR}
+    FILES_MATCHING PATTERN "*.cmake" PATTERN "*.in"
+)
+
+# 3. Generate and install the package configuration file.
+configure_package_config_file(
+    "modules/kis_build_system-config.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
+    INSTALL_DESTINATION ${INSTALL_CMAKEDIR}
+)
+
+# 4. Generate the version file.
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-configVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
+
+# 5. Install the config and version files.
+install(
+    FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-configVersion.cmake"
+    DESTINATION ${INSTALL_CMAKEDIR}
+)
+
+# 6. Define the INTERFACE target for consistency.
+if(NOT TARGET kis_build_system_pkg)
+    add_library(kis_build_system_pkg INTERFACE)
+    add_library(kis::build_system ALIAS kis_build_system_pkg)
+endif()
+
+message(STATUS "Configured kis_build_system package. It provides CMake functions, not libraries.")

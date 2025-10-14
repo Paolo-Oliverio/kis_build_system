@@ -1,0 +1,6 @@
+# kis_build_system-config.cmake.in
+@PACKAGE_INIT@
+
+# This file makes all the build system functions available to the project
+# that found it, by including the main module file.
+include("${CMAKE_CURRENT_LIST_DIR}/kis_build_system.cmake")
