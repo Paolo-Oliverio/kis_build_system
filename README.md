@@ -1,6 +1,6 @@
 # KIS SDK Build System
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE.txt)
 
 This repository contains the centralized CMake build and packaging logic for the **kis_sdk**. It is designed as a modular, versioned, and installable CMake package, providing a single source of truth for building all components within the kis_ ecosystem.
 
