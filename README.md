@@ -47,7 +47,7 @@ if(NOT BUILDING_WITH_SUPERBUILD)
         include(FetchContent)
         FetchContent_Declare(
             kis_build_system
-            GIT_REPOSITORY https://github.com/your-org/kis_build_system.git
+            GIT_REPOSITORY https://github.com/Paolo-Oliverio/kis_build_system.git
             GIT_TAG        v0.1.0
         )
         FetchContent_MakeAvailable(kis_build_system)
