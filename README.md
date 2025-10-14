@@ -2,15 +2,15 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repository contains the centralized CMake build and packaging logic for the **KIS SDK**. It is designed as a modular, versioned, and installable CMake package, providing a single source of truth for building all components within the KIS ecosystem.
+This repository contains the centralized CMake build and packaging logic for the **kis_sdk**. It is designed as a modular, versioned, and installable CMake package, providing a single source of truth for building all components within the kis_ ecosystem.
 
-This package provides CMake functions, not libraries. Its purpose is to be consumed by other KIS packages to ensure they are built, tested, and installed in a consistent and robust manner.
+This package provides CMake functions, not libraries. Its purpose is to be consumed by other kis_ packages to ensure they are built, tested, and installed in a consistent and robust manner.
 
 ## Key Features
 
--   **Context-Aware Building**: Enables KIS packages to be built seamlessly either as part of the main [KIS SDK Superbuild](https://github.com/Paolo-Oliverio/kis_sdk) or as standalone projects.
--   **Dependency Management**: Provides helpers for declaring and resolving both first-party (KIS) and third-party dependencies.
--   **Automated Packaging**: Standardizes the installation and CMake package configuration (`<Package>Config.cmake`) generation for all KIS libraries.
+-   **Context-Aware Building**: Enables kis_ packages to be built seamlessly either as part of the main [kis_sdk](https://github.com/Paolo-Oliverio/kis_sdk) or as standalone projects.
+-   **Dependency Management**: Provides helpers for declaring and resolving both first-party (kis_) and third-party dependencies.
+-   **Automated Packaging**: Standardizes the installation and CMake package configuration (`<Package>Config.cmake`) generation for all kis_ libraries.
 -   **Consistent Tooling**: Enforces consistent settings and options across the entire SDK.
 -   **Component Registration**: Offers simple functions (`kis_add_test`, `kis_add_sample`) for adding optional components like tests and samples.
 
@@ -29,8 +29,9 @@ This "find-or-fetch" mechanism ensures that a package is always self-contained a
 ## Usage
 
 Direct usage of this repository is uncommon. It is designed to be used implicitly by other KIS packages.
+Templates for various kind of packages will be available to kickstart kis_ package development.
 
-If you are developing a new package for the KIS SDK, your `CMakeLists.txt` should include a block similar to this:
+As now to use this build system a `CMakeLists.txt` should include a block similar to this:
 
 ```cmake
 # CMakeLists.txt for a new KIS package
