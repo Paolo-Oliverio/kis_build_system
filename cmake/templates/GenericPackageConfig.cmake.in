@@ -1,0 +1,25 @@
+# cmake/templates/GenericPackageConfig.cmake.in
+#
+# This is a generic template used by the KIS SDK build system for any package
+# that does not provide its own custom Config.cmake.in file.
+
+# This line will be configured by the packaging module. It substitutes the
+# @PACKAGE_FIND_DEPENDENCIES@ placeholder with the list of dependencies
+# from the package's kis.package.cmake manifest. This makes the list
+# available to the find_dependency() calls below.
+set(PACKAGE_FIND_DEPENDENCIES "@PACKAGE_FIND_DEPENDENCIES@")
+
+@PACKAGE_INIT@
+
+# Now that PACKAGE_FIND_DEPENDENCIES is set, we can use it.
+include(CMakeFindDependencyMacro)
+foreach(dep IN LISTS PACKAGE_FIND_DEPENDENCIES)
+    find_dependency(${dep})
+endforeach()
+
+# Include the auto-generated targets file.
+# This file contains the INTERFACE properties and import statements for the
+# package's targets (e.g., kis::core_utils).
+if(NOT TARGET kis::@PACKAGE_NAME@)
+    include("${CMAKE_CURRENT_LIST_DIR}/@PACKAGE_NAME@-targets.cmake")
+endif()
