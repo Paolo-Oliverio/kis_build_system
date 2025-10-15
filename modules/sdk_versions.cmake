@@ -7,4 +7,6 @@
 message(STATUS "Loading SDK third-party versions...") 
 
 set(KIS_THIRDPARTY_DOCTEST_VERSION "v2.4.12" CACHE STRING "Canonical version for the 'doctest' library" FORCE)
+set(KIS_THIRDPARTY_GLFW3_VERSION "3.4" CACHE STRING "Canonical version for the 'glfw3' library" FORCE)
+
 # ... etc for all other third-party dependencies ...

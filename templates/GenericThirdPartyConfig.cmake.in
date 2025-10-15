@@ -1,0 +1,14 @@
+# kis_build_system/templates/GenericThirdPartyConfig.cmake.in
+#
+# This is a minimal config file template used to make third-party libraries
+# downloaded via FetchContent findable with find_package() after installation.
+# Its only job is to include the targets file we generated for the library.
+
+@PACKAGE_INIT@
+
+# The root CMakeLists.txt sets TPL_EXPORT_NAME to the dependency name (e.g., "doctest").
+# The install(EXPORT ...) command creates a file named "doctest-targets.cmake".
+# This line includes that file, making the imported targets (e.g., doctest::doctest) available.
+if(NOT TARGET @TPL_NAMESPACE@::@TPL_TARGET_NAME@)
+    include("${CMAKE_CURRENT_LIST_DIR}/@TPL_EXPORT_NAME@-targets.cmake")
+endif()

@@ -1,25 +1,127 @@
 # cmake/templates/GenericPackageConfig.cmake.in
-#
-# This is a generic template used by the KIS SDK build system for any package
-# that does not provide its own custom Config.cmake.in file.
-
-# This line will be configured by the packaging module. It substitutes the
-# @PACKAGE_FIND_DEPENDENCIES@ placeholder with the list of dependencies
-# from the package's kis.package.cmake manifest. This makes the list
-# available to the find_dependency() calls below.
-set(PACKAGE_FIND_DEPENDENCIES "@PACKAGE_FIND_DEPENDENCIES@")
 
 @PACKAGE_INIT@
 
-# Now that PACKAGE_FIND_DEPENDENCIES is set, we can use it.
+set(PACKAGE_FIND_DEPENDENCIES "@PACKAGE_FIND_DEPENDENCIES@")
+
+# Package metadata for tooling (optional) - use namespaced variables to avoid
+# collisions when multiple packages are loaded. Consumers can read these after
+# calling find_package(<PackageName>).
+set(@PACKAGE_NAME@_category "@PACKAGE_CATEGORY@")
+set(@PACKAGE_NAME@_search_tags "@PACKAGE_SEARCH_TAGS@")
+
 include(CMakeFindDependencyMacro)
 foreach(dep IN LISTS PACKAGE_FIND_DEPENDENCIES)
     find_dependency(${dep})
 endforeach()
 
-# Include the auto-generated targets file.
-# This file contains the INTERFACE properties and import statements for the
-# package's targets (e.g., kis::core_utils).
-if(NOT TARGET kis::@PACKAGE_NAME@)
-    include("${CMAKE_CURRENT_LIST_DIR}/@PACKAGE_NAME@-targets.cmake")
+# =============================================================================
+# VARIANT SELECTION LOGIC
+# =============================================================================
+
+# Check if this is a multi-variant package (PER_CONFIG) vs ABI_INVARIANT
+set(_package_abi_variant "@PACKAGE_ABI_VARIANT@")
+set(_installed_variants "@INSTALLED_VARIANTS@")
+
+# Default to PER_CONFIG if not specified
+if(NOT _package_abi_variant)
+    set(_package_abi_variant "PER_CONFIG")
 endif()
+
+if(_package_abi_variant STREQUAL "PER_CONFIG" AND _installed_variants)
+    # This package has multiple variants available - use the variant selection system
+    
+    # Load the SDK's variant selection logic if not already loaded
+    if(NOT COMMAND kis_sdk_select_variant)
+        set(_variants_file "${CMAKE_CURRENT_LIST_DIR}/../../KIS_SDK/KIS_SDKVariants.cmake")
+        if(EXISTS "${_variants_file}")
+            include("${_variants_file}")
+        else()
+            message(FATAL_ERROR 
+                "@PACKAGE_NAME@: This package requires variant selection support, "
+                "but KIS_SDKVariants.cmake was not found at: ${_variants_file}")
+        endif()
+    endif()
+    
+    # Determine which variant to use for this package
+    kis_sdk_select_variant(@PACKAGE_NAME@ _requested_variant)
+    
+    # Normalize empty variant to "release"
+    if(NOT _requested_variant OR _requested_variant STREQUAL "")
+        set(_requested_variant "release")
+    endif()
+    
+    # Check if the requested variant is available
+    set(_selected_variant "")
+    if(_requested_variant IN_LIST _installed_variants)
+        set(_selected_variant "${_requested_variant}")
+        if(NOT DEFINED CACHE{KIS_SDK_VARIANT_SELECTION_@PACKAGE_NAME@})
+            message(STATUS "  [@PACKAGE_NAME@] Using variant: ${_selected_variant}")
+            set(KIS_SDK_VARIANT_SELECTION_@PACKAGE_NAME@ TRUE CACHE INTERNAL "")
+        endif()
+    else()
+        # Requested variant not available - try to find a compatible fallback
+        kis_sdk_find_compatible_variant(
+            "${_requested_variant}"
+            "${_installed_variants}"
+            _selected_variant
+        )
+        
+        if(_selected_variant)
+            if(NOT DEFINED CACHE{KIS_SDK_VARIANT_SELECTION_@PACKAGE_NAME@})
+                message(STATUS "  [@PACKAGE_NAME@] Requested '${_requested_variant}' not available")
+                message(STATUS "  [@PACKAGE_NAME@] Using compatible fallback: ${_selected_variant}")
+                set(KIS_SDK_VARIANT_SELECTION_@PACKAGE_NAME@ TRUE CACHE INTERNAL "")
+            endif()
+        else()
+            string(REPLACE ";" ", " _available_variants_str "${_installed_variants}")
+            message(FATAL_ERROR 
+                "@PACKAGE_NAME@: Requested variant '${_requested_variant}' is not available "
+                "and no compatible fallback was found.\n"
+                "Available variants: ${_available_variants_str}\n"
+                "\n"
+                "To fix this:\n"
+                "1. Install the requested variant: cmake --preset ${_requested_variant} --target install\n"
+                "2. Or use a compatible variant from the same ABI group\n"
+                "3. Or set KIS_SDK_VARIANT_@PACKAGE_NAME@ to an available variant")
+        endif()
+    endif()
+    
+    # Include the variant-specific targets file
+    set(_targets_file "${CMAKE_CURRENT_LIST_DIR}/@PACKAGE_NAME@-targets-${_selected_variant}.cmake")
+    
+    # Register this package and its variant for ABI validation
+    kis_sdk_register_package_variant(@PACKAGE_NAME@ "${_selected_variant}")
+else()
+    # This is an ABI_INVARIANT (formerly DEFAULT) package - use the standard targets file
+    # These are header-only or truly ABI-invariant libraries shared across all configs
+    set(_targets_file "${CMAKE_CURRENT_LIST_DIR}/@PACKAGE_NAME@-targets.cmake")
+    
+    # Still register for tracking, using "abi_invariant" as the variant
+    if(COMMAND kis_sdk_register_package_variant)
+        kis_sdk_register_package_variant(@PACKAGE_NAME@ "abi_invariant")
+    endif()
+endif()
+
+# Include the targets file
+if(NOT TARGET kis::@PACKAGE_NAME@)
+    if(NOT EXISTS "${_targets_file}")
+        message(FATAL_ERROR 
+            "@PACKAGE_NAME@: Expected targets file not found: ${_targets_file}")
+    endif()
+    include("${_targets_file}")
+endif()
+
+# --- Include Public CMake Modules ---
+# Convention: If the package provides a cmake/public_modules directory, it must
+# contain a master file named <package_name>_cmake_modules.cmake.
+if(@PACKAGE_HAS_CMAKE_MODULES@)
+    include("${CMAKE_CURRENT_LIST_DIR}/@PACKAGE_NAME@_cmake_modules.cmake")
+endif()
+
+# Clean up internal variables
+unset(_package_abi_variant)
+unset(_installed_variants)
+unset(_selected_variant)
+unset(_targets_file)
+unset(_variants_file)

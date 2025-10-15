@@ -9,7 +9,7 @@ set(CMAKE_DEBUG_POSTFIX "_d" CACHE STRING "Default suffix for debug-mode library
 # It sets the canonical build settings that all packages will later read.
 
 # 1. Define properties that should be PUBLIC on consuming packages.
-set_property(GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_FEATURES cxx_std_17)
+set_property(GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_FEATURES cxx_std_20)
 set_property(GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_DEFINITIONS
     $<$<PLATFORM_ID:Windows>:UNICODE;_UNICODE>
     KIS_DISABLE_DEPRECATED

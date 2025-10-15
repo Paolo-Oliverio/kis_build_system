@@ -2,9 +2,7 @@
 
 # This function is for STANDALONE builds.
 function(apply_kis_build_presets TARGET_NAME)
-    # Add alias-checking to make this function robust. It will resolve an
-    # alias like 'kis::build_system' to its real target 'kis_build_system_pkg'
-    # before attempting to modify it.
+    # Add alias-checking to make this function robust.
     set(TARGET_TO_MODIFY ${TARGET_NAME})
     get_target_property(ALIASED_TARGET_NAME ${TARGET_NAME} ALIASED_TARGET)
     if(ALIASED_TARGET_NAME)
@@ -16,14 +14,14 @@ function(apply_kis_build_presets TARGET_NAME)
         # Interface libraries propagate everything via the INTERFACE keyword.
         target_compile_features(${TARGET_TO_MODIFY} INTERFACE cxx_std_17)
         target_compile_definitions(${TARGET_TO_MODIFY} INTERFACE
-            $<$<PLAT_ID:Windows>:UNICODE;_UNICODE>
+            $<$<PLATFORM_ID:Windows>:UNICODE;_UNICODE>
             KIS_DISABLE_DEPRECATED
         )
     else()
         # Regular libraries have public and private properties.
         target_compile_features(${TARGET_TO_MODIFY} PUBLIC cxx_std_17)
         target_compile_definitions(${TARGET_TO_MODIFY} PUBLIC
-            $<$<PLAT_ID:Windows>:UNICODE;_UNICODE>
+            $<$<PLATFORM_ID:Windows>:UNICODE;_UNICODE>
             KIS_DISABLE_DEPRECATED
         )
         target_compile_options(${TARGET_TO_MODIFY} PRIVATE
@@ -35,7 +33,7 @@ endfunction()
 
 
 # This function is for SUPERBUILDS. It reads the globally defined SDK settings
-# and applies them to a given package target. (This function is already correct).
+# and applies them to a given package target.
 function(kis_apply_sdk_build_settings_to_target TARGET_NAME)
     message(STATUS "Applying SDK build settings to ${TARGET_NAME}")
     get_property(public_features GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_FEATURES)

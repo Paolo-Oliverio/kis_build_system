@@ -21,10 +21,13 @@ function(_kis_add_component COMPONENT_TYPE TARGET_NAME)
     set_target_properties(${TARGET_NAME} PROPERTIES
         # Group targets neatly in IDEs like Visual Studio and VS Code
         FOLDER "${COMPONENT_TYPE}/${PROJECT_NAME}"
-        # Do not build this target as part of the default "all" build.
-        # It must be built explicitly or via a meta-target (e.g., 'all_tests').
-        EXCLUDE_FROM_ALL TRUE
     )
+
+    if(NOT KIS_BUILD_COMPONENTS_IN_ALL)
+        # If the option is OFF, restore the old behavior.        
+        # It must be built explicitly or via a meta-target (e.g., 'all_tests').
+        list(APPEND component_properties EXCLUDE_FROM_ALL TRUE)
+    endif()
 
     # Link libraries
     target_link_libraries(${TARGET_NAME} PRIVATE ${ARG_LINK_LIBRARIES})
