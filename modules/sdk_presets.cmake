@@ -4,11 +4,19 @@ message(STATUS "Loading SDK compiler presets...")
 
 set(CMAKE_DEBUG_POSTFIX "_d" CACHE STRING "Default suffix for debug-mode library files.")
 
-include(presets_logic)
+# --- THE NEW APPROACH: Define settings in global properties ---
+# This is the ONLY responsibility of this file in a superbuild context.
+# It sets the canonical build settings that all packages will later read.
 
-# --- THE KEY CHANGE ---
-# Instead of creating a new 'kis_sdk_presets' target, we find the existing
-# 'kis::build_system' target (which is guaranteed to exist by now) and
-# apply all the compiler settings directly to it.
-message(STATUS "--> Applying presets to the central kis::build_system target")
-apply_kis_build_presets(kis::build_system)
+# 1. Define properties that should be PUBLIC on consuming packages.
+set_property(GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_FEATURES cxx_std_17)
+set_property(GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_DEFINITIONS
+    $<$<PLATFORM_ID:Windows>:UNICODE;_UNICODE>
+    KIS_DISABLE_DEPRECATED
+)
+
+# 2. Define properties that should be PRIVATE to our SDK packages' build.
+set_property(GLOBAL PROPERTY KIS_SDK_PRIVATE_COMPILE_OPTIONS
+    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<CXX_COMPILER_ID:AppleClang>>>:-Wall -Wextra -Wpedantic -Werror>
+)
