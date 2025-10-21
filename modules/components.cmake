@@ -26,7 +26,7 @@ function(_kis_add_component COMPONENT_TYPE TARGET_NAME)
     if(NOT KIS_BUILD_COMPONENTS_IN_ALL)
         # If the option is OFF, restore the old behavior.        
         # It must be built explicitly or via a meta-target (e.g., 'all_tests').
-        list(APPEND component_properties EXCLUDE_FROM_ALL TRUE)
+        set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
     endif()
 
     # Link libraries
@@ -49,7 +49,9 @@ endfunction()
 function(kis_add_test TARGET_NAME)
     _kis_add_component("Tests" ${TARGET_NAME} ${ARGN})
     message(STATUS "Registering test: ${TARGET_NAME}")
-    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+    if(COMMAND add_test)
+        add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+    endif()
 endfunction()
 
 #

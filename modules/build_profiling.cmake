@@ -197,9 +197,11 @@ function(kis_profile_report)
         
         # Create bar
         set(bar "")
-        foreach(i RANGE 1 ${bar_len})
-            string(APPEND bar "#")
-        endforeach()
+        if(bar_len GREATER 0)
+            foreach(i RANGE 1 ${bar_len})
+                string(APPEND bar "#")
+            endforeach()
+        endif()
         
         # Format package name (pad to 25 chars)
         string(LENGTH "${pkg_name}" name_len)

@@ -50,7 +50,7 @@ endfunction()
 #
 # kis_glob_package_manifests
 #
-# Recursively discovers all kis.package.cmake manifest files under a root path.
+# Recursively discovers all kis.package.json manifest files under a root path.
 #
 # Usage:
 #   kis_glob_package_manifests(<root_path> <out_manifests_var>)
@@ -69,7 +69,7 @@ function(kis_glob_package_manifests root_path out_manifests_var)
     endif()
     
     file(GLOB_RECURSE manifests 
-        "${root_path}/*/kis.package.cmake"
+        "${root_path}/*/kis.package.json"
     )
     
     set(${out_manifests_var} ${manifests} PARENT_SCOPE)
@@ -176,35 +176,5 @@ function(kis_validate_directory path out_is_valid_var)
         message(WARNING "${ARG_ERROR_MESSAGE}: ${path}")
     endif()
     
-    set(${out_is_valid_var} ${is_valid} PARENT_SCOPE)
-endfunction()
-
-# ==============================================================================
-#           PATH UTILITIES
-# ==============================================================================
-
-#
-# kis_get_package_name_from_path
-#
-# Extracts the package name from a full package path or manifest path.
-#
-# Usage:
-#   kis_get_package_name_from_path(<path> <out_name_var>)
-#
-# Arguments:
-#   path         : Full path to package directory or manifest file
-#   out_name_var : Output variable name (will contain package name)
-#
-# Example:
-#   kis_get_package_name_from_path("/path/to/kis_packages/kis_core" pkg_name)
-#   # pkg_name = "kis_core"
-#
-function(kis_get_package_name_from_path path out_name_var)
-    # If path is a file, get its directory first
-    if(NOT IS_DIRECTORY "${path}")
-        get_filename_component(path "${path}" DIRECTORY)
-    endif()
-    
-    get_filename_component(pkg_name "${path}" NAME)
-    set(${out_name_var} ${pkg_name} PARENT_SCOPE)
+    set(${is_valid_var} ${is_valid} PARENT_SCOPE)
 endfunction()

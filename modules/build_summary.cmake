@@ -26,7 +26,7 @@ function(kis_print_build_summary)
     set(imported_list "")
     
     foreach(package_path ${all_packages})
-        get_filename_component(package_name ${package_path} NAME)
+        kis_get_package_name_from_path("${package_path}" package_name)
         
         if(TARGET ${package_name})
             # Check if it's an imported target
@@ -43,8 +43,8 @@ function(kis_print_build_summary)
         endif()
     endforeach()
     
-    # Get third-party dependencies
-    get_property(third_party_deps GLOBAL PROPERTY KIS_DECLARED_DEPENDENCY_NAMES)
+    # Get third-party dependencies from the central state
+    kis_state_get_tpl_dependency_names(third_party_deps)
     if(third_party_deps)
         list(REMOVE_DUPLICATES third_party_deps)
         list(LENGTH third_party_deps third_party_count)

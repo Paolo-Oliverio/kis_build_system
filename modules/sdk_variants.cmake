@@ -85,7 +85,7 @@ function(kis_prescan_custom_variants)
     set(scanned_count 0)
     set(custom_variants_found "")
     
-    # Find all kis.package.cmake files in the workspace using unified utility
+    # Find all kis.package.json files in the workspace using unified utility
     kis_glob_package_manifests(
         "${CMAKE_CURRENT_SOURCE_DIR}/kis_packages"
         package_manifests
@@ -95,24 +95,15 @@ function(kis_prescan_custom_variants)
         # Extract package name from path using utility
         kis_get_package_name_from_path("${manifest_file}" package_name)
         
-        # Read the manifest file to check for PACKAGE_CUSTOM_VARIANTS
         file(READ "${manifest_file}" manifest_content)
         
-        # Check if it defines custom variants (simple regex check)
-        if(manifest_content MATCHES "set\\(PACKAGE_CUSTOM_VARIANTS[ \\t]+\"([^\"]+)\"\\)")
-            set(variants_spec "${CMAKE_MATCH_1}")
-            
-            # Include the manifest to get the actual values
-            set(PACKAGE_NAME "")
-            set(PACKAGE_CUSTOM_VARIANTS "")
-            include("${manifest_file}")
-            
-            if(PACKAGE_CUSTOM_VARIANTS)
-                # Register the custom variants immediately
-                kis_register_package_custom_variants("${PACKAGE_NAME}" "${PACKAGE_CUSTOM_VARIANTS}")
-                list(APPEND custom_variants_found "${PACKAGE_NAME}")
-                math(EXPR scanned_count "${scanned_count} + 1")
-            endif()
+        # Check if it defines custom variants
+        string(JSON custom_variants_json ERROR_VARIABLE err GET "${manifest_content}" "abi" "customVariants")
+        if(NOT err AND custom_variants_json)
+            # Register the custom variants immediately
+            kis_register_package_custom_variants("${package_name}" "${custom_variants_json}")
+            list(APPEND custom_variants_found "${package_name}")
+            math(EXPR scanned_count "${scanned_count} + 1")
         endif()
     endforeach()
     
@@ -131,29 +122,31 @@ endfunction()
 #
 # Args:
 #   package_name: Name of the package
-#   custom_variants_spec: List of variant specs in format "name:abi_group:description"
+#   custom_variants_json: JSON array string of variant objects
 #
-function(kis_register_package_custom_variants package_name custom_variants_spec)
-    if(NOT custom_variants_spec)
+function(kis_register_package_custom_variants package_name custom_variants_json)
+    if(NOT custom_variants_json)
+        return()
+    endif()
+
+    string(JSON num_variants LENGTH "${custom_variants_json}")
+    if(num_variants EQUAL 0)
         return()
     endif()
     
-    foreach(variant_spec ${custom_variants_spec})
-        # Parse: "gpu-profile:RELEASE:Description text"
-        string(REPLACE ":" ";" spec_parts "${variant_spec}")
-        list(LENGTH spec_parts parts_count)
+    math(EXPR last_idx "${num_variants} - 1")
+    foreach(i RANGE ${last_idx})
+        string(JSON variant_obj GET "${custom_variants_json}" ${i})
+        string(JSON variant_name GET "${variant_obj}" "name")
+        string(JSON abi_group GET "${variant_obj}" "abiGroup")
+        string(JSON description GET "${variant_obj}" "description")
         
-        if(parts_count LESS 2)
-            kis_collect_warning("Invalid custom variant spec '${variant_spec}' in package ${package_name}")
+        if(NOT variant_name OR NOT abi_group)
+            kis_collect_warning("Invalid custom variant object in package ${package_name}: must have 'name' and 'abiGroup'")
             continue()
         endif()
-        
-        list(GET spec_parts 0 variant_name)
-        list(GET spec_parts 1 abi_group)
-        
-        if(parts_count GREATER 2)
-            list(GET spec_parts 2 description)
-        else()
+
+        if(NOT description)
             set(description "Custom variant ${variant_name}")
         endif()
         

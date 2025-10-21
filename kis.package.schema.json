@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://your-org.com/kis.package.schema.json",
+  "title": "KIS Package Manifest",
+  "description": "Schema for the kis.package.json manifest file, which defines a package within the KIS SDK.",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "type"
+  ],
+  "properties": {
+    "name": {
+      "description": "The unique, official name of the package. Must be a valid CMake target name.",
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_]+$"
+    },
+    "version": {
+      "description": "The semantic version of the package (e.g., '1.2.3').",
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+    },
+    "type": {
+      "description": "The type of CMake target this package creates.",
+      "type": "string",
+      "enum": [
+        "LIBRARY",
+        "INTERFACE",
+        "EXECUTABLE"
+      ]
+    },
+    "description": {
+      "description": "A brief, human-readable description of the package's purpose.",
+      "type": "string"
+    },
+    "category": {
+      "description": "A high-level category for UI grouping and organization (e.g., 'Rendering', 'Core', 'Tools').",
+      "type": "string"
+    },
+    "searchTags": {
+      "description": "A list of keywords for searching and filtering packages.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "features": {
+      "description": "A list of features this package provides or requires. The package will only be configured if at least one of these features is active in the build.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "overrides": {
+      "description": "A list of package names that this package replaces, typically for platform-specific implementations.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_]+$"
+      },
+      "uniqueItems": true
+    },
+    "platform": {
+      "description": "Defines platform compatibility rules for the package.",
+      "type": "object",
+      "properties": {
+        "platforms": {
+          "description": "A whitelist of specific platforms (e.g., 'windows', 'linux'). If present, the build platform must be in this list.",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "tags": {
+          "description": "A whitelist of platform tags (e.g., 'desktop', 'posix'). The build must have at least one of these tags.",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "excludes": {
+          "description": "A blacklist of platforms or tags. The build cannot have any of these.",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "requiresTags": {
+          "description": "A list of tags that must ALL be present for the package to be included.",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "excludesTags": {
+          "description": "A list of tags where NONE may be present for the package to be included.",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "abi": {
+      "description": "Defines ABI compatibility and variant information.",
+      "type": "object",
+      "properties": {
+        "variant": {
+          "description": "Specifies the ABI compatibility model for the package.",
+          "type": "string",
+          "enum": ["PER_CONFIG", "ABI_INVARIANT"],
+          "default": "PER_CONFIG"
+        },
+        "supportedVariants": {
+          "description": "For PER_CONFIG packages, a list of variants this package explicitly supports (e.g., 'profiling'). 'release' and 'debug' are always implicitly supported.",
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "customVariants": {
+          "description": "Defines new, custom build variants provided by this package.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/customVariant" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "dependencies": {
+      "description": "Declares dependencies on other KIS or third-party packages.",
+      "type": "object",
+      "properties": {
+        "kis": {
+          "description": "Dependencies on other first-party KIS packages.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/kisDependency" }
+        },
+        "thirdParty": {
+          "description": "Dependencies on external third-party libraries.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/thirdPartyDependency" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "customVariant": {
+      "type": "object",
+      "required": ["name", "abiGroup"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "abiGroup": { "type": "string", "enum": ["RELEASE", "DEBUG"] },
+        "description": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "kisDependency": {
+      "type": "object",
+      "required": ["name", "url", "tag"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-zA-Z0-9_]+$" },
+        "url": { "type": "string", "format": "uri" },
+        "tag": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "dependencyOption": {
+        "type": "object",
+        "description": "A CMake cache variable to set for the dependency.",
+        "required": ["name", "value", "type"],
+        "properties": {
+            "name": { "type": "string", "description": "The name of the CMake variable (e.g., 'GLFW_BUILD_TESTS')." },
+            "value": { "type": "string", "description": "The value to set for the variable (e.g., 'OFF', 'ON', 'path/to/something')." },
+            "type": { "type": "string", "description": "The CMake cache variable type.", "enum": ["BOOL", "STRING", "PATH", "FILEPATH"] },
+            "condition": { "type": "string", "description": "A CMake conditional expression (e.g., 'WIN32', 'UNIX AND NOT APPLE'). The option is only set if this condition is true." }
+        },
+        "additionalProperties": false
+    },
+    "thirdPartyDependency": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-zA-Z0-9_]+$" },
+        "git": { "description": "URL of the Git repository.", "type": "string", "format": "uri" },
+        "tag": { "description": "Git tag, branch, or commit hash.", "type": "string" },
+        "url": { "description": "Direct download URL for an archive (zip, tar.gz).", "type": "string", "format": "uri" },
+        "hash": { "description": "Checksum for the downloaded archive (e.g., 'SHA256=...').", "type": "string" },
+        "condition": { "type": "string", "description": "CMake variable that must be ON for this dependency to be included." },
+        "options": {
+            "description": "A list of CMake options to configure the dependency.",
+            "type": "array",
+            "items": { "$ref": "#/$defs/dependencyOption" }
+        }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "description": "A dependency fetched from a Git repository.",
+          "required": ["git", "tag"]
+        },
+        {
+          "description": "A dependency fetched from a URL (e.g., zip, tar.gz).",
+          "required": ["url", "hash"]
+        }
+      ]
+    }
+  }
+}

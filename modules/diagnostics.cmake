@@ -1,145 +1,140 @@
 # kis_build_system/modules/diagnostics.cmake
-# Diagnostic and troubleshooting utilities
+#
+# Provides build environment validation, cache staleness detection,
+# and collects/reports configuration warnings.
 
-#
-# kis_validate_environment()
-#
-# Validates that all required tools and settings are correct before build.
-# Call this early in the superbuild to catch issues upfront.
-#
-function(kis_validate_environment)
-    set(has_errors FALSE)
-    
-    message(STATUS "Validating build environment...")
-    list(APPEND CMAKE_MESSAGE_INDENT "  ")
-    
-    # Check Git availability
-    find_package(Git QUIET)
-    if(NOT Git_FOUND)
-        if(KIS_SDK_RESOLVE_PACKAGES)
-            message(SEND_ERROR 
-                "[ERROR] Git is required for KIS_SDK_RESOLVE_PACKAGES=ON\n"
-                "   Install Git or set -DKIS_SDK_RESOLVE_PACKAGES=OFF"
-            )
-            set(has_errors TRUE)
-        else()
-            message(STATUS "[WARNING] Git not found (not needed with KIS_SDK_RESOLVE_PACKAGES=OFF)")
-        endif()
+include_guard(GLOBAL)
+
+# ==============================================================================
+#           WARNING COLLECTION & SUMMARY
+# ==============================================================================
+function(kis_collect_warning)
+    if(ARGC EQUAL 1)
+        set(warning_text "${ARGV0}")
+    elseif(ARGC EQUAL 3)
+        set(warning_text "${ARGV0}: ${ARGV1} | Hint: ${ARGV2}")
     else()
-        message(STATUS "[OK] Git found: ${GIT_EXECUTABLE}")
+        message(FATAL_ERROR "kis_collect_warning expects 1 or 3 arguments")
     endif()
-    
-    # Check CMake version vs features
-    if(CMAKE_VERSION VERSION_LESS "3.20")
-        message(SEND_ERROR "[ERROR] CMake 3.20+ required, found ${CMAKE_VERSION}")
-        set(has_errors TRUE)
-    else()
-        message(STATUS "[OK] CMake version: ${CMAKE_VERSION}")
-    endif()
-    
-    # Check compiler
-    if(CMAKE_CXX_COMPILER)
-        message(STATUS "[OK] C++ Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-    else()
-        message(SEND_ERROR "[ERROR] No C++ compiler found")
-        set(has_errors TRUE)
-    endif()
-    
-    # Validate platform detection
-    if(NOT DEFINED KIS_PLATFORM_TAGS)
-        kis_collect_warning("KIS_PLATFORM_TAGS not set - platform detection may have failed")
-    else()
-        message(STATUS "[OK] Platform tags: ${KIS_PLATFORM_TAGS}")
-    endif()
-    
-    # Check for ninja if specified
-    if(CMAKE_GENERATOR MATCHES "Ninja")
-        find_program(NINJA_EXECUTABLE ninja)
-        if(NOT NINJA_EXECUTABLE)
-            kis_collect_warning("Ninja generator specified but ninja not found in PATH")
-        else()
-            message(STATUS "[OK] Ninja found: ${NINJA_EXECUTABLE}")
-        endif()
-    endif()
-    
-    list(POP_BACK CMAKE_MESSAGE_INDENT)
-    
-    if(has_errors)
-        message(FATAL_ERROR 
-            "[ERROR] Environment validation failed!\n"
-            "   See errors above. Fix them and reconfigure."
-        )
-    else()
-        message(STATUS "[OK] Environment validation passed")
-    endif()
+    kis_state_add_warning("${warning_text}")
 endfunction()
 
-
-#
-# kis_print_dependency_summary()
-#
-# Prints a summary of all resolved dependencies for diagnostic purposes.
-#
-function(kis_print_dependency_summary)
-    message(STATUS "\n=== Dependency Summary ===")
-    
-    # Third-party dependencies
-    get_property(third_party_deps GLOBAL PROPERTY KIS_DECLARED_DEPENDENCY_NAMES)
-    if(third_party_deps)
-        list(REMOVE_DUPLICATES third_party_deps)
-        message(STATUS "\nThird-Party Dependencies (${CMAKE_CURRENT_LIST_LENGTH third_party_deps}):")
-        foreach(dep ${third_party_deps})
-            get_property(dep_version GLOBAL PROPERTY KIS_DEP_VERSION_${dep})
-            if(dep_version)
-                message(STATUS "  • ${dep} @ ${dep_version}")
-            else()
-                message(STATUS "  • ${dep}")
-            endif()
+function(kis_print_warning_summary)
+    kis_state_get_warnings(warnings count)
+    if(count GREATER 0)
+        message(STATUS "")
+        message(STATUS "╔═══════════════════════════════════════════════════════════════════════╗")
+        message(STATUS "              [WARNING] Configuration Warnings (${count})")
+        message(STATUS "╚═══════════════════════════════════════════════════════════════════════╝")
+        message(STATUS "")
+        set(warning_num 1)
+        foreach(warning ${warnings})
+            message(STATUS "  ${warning_num}. ${warning}")
+            math(EXPR warning_num "${warning_num} + 1")
         endforeach()
+        message(STATUS "")
+        message(STATUS "┌──────────────────────────────────────────────────────────────────────┐")
+        message(STATUS "│ [TIP] Address these warnings to ensure optimal build configuration   │")
+        message(STATUS "└──────────────────────────────────────────────────────────────────────┘")
+        message(STATUS "")
+    else()
+        kis_message_verbose("No configuration warnings")
     endif()
-    
-    # Package count
-    message(STATUS "\nFirst-Party Packages: ${SDK_PACKAGES}")
-    
-    message(STATUS "========================\n")
 endfunction()
 
+# ==============================================================================
+#           CACHE STALENESS DETECTION
+# ==============================================================================
+function(kis_check_cache_staleness)
+    if(NOT EXISTS "${CMAKE_BINARY_DIR}/CMakeCache.txt")
+        return()
+    endif()
+    set(issues_found FALSE)
+    if(DEFINED CACHE{KIS_PLATFORM_CACHED})
+        if(NOT "${KIS_PLATFORM}" STREQUAL "${KIS_PLATFORM_CACHED}")
+            kis_collect_warning("Cache Staleness" "Platform changed..." "Delete build dir...")
+            set(issues_found TRUE)
+        endif()
+    else()
+        set(KIS_PLATFORM_CACHED "${KIS_PLATFORM}" CACHE INTERNAL "...")
+    endif()
+    if(DEFINED CACHE{KIS_GENERATOR_CACHED})
+        if(NOT "${CMAKE_GENERATOR}" STREQUAL "${KIS_GENERATOR_CACHED}")
+            kis_collect_warning("Cache Staleness" "Generator changed..." "Delete build dir...")
+            set(issues_found TRUE)
+        endif()
+    else()
+        set(KIS_GENERATOR_CACHED "${CMAKE_GENERATOR}" CACHE INTERNAL "...")
+    endif()
+    if(DEFINED CACHE{KIS_SOURCE_DIR_CACHED})
+        if(NOT "${CMAKE_SOURCE_DIR}" STREQUAL "${KIS_SOURCE_DIR_CACHED}")
+            kis_collect_warning("Cache Staleness" "Source directory changed..." "Delete build dir...")
+            set(issues_found TRUE)
+        endif()
+    else()
+        set(KIS_SOURCE_DIR_CACHED "${CMAKE_SOURCE_DIR}" CACHE INTERNAL "...")
+    endif()
+    if(issues_found)
+        message(STATUS "\n━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️  CACHE STALENESS DETECTED\n━━━━━━━━━━━━━━━━━━━━━━━━")
+    endif()
+endfunction()
 
-#
-# kis_dump_cache_variables()
-#
-# Dumps all KIS_* cache variables for debugging.
-#
+# ==============================================================================
+#           ENVIRONMENT VALIDATION
+# ==============================================================================
+function(kis_validate_environment)
+    if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
+        kis_collect_warning("Environment Validation" "In-source build detected..." "Use out-of-source build...")
+    endif()
+    find_package(Git QUIET)
+    if(NOT Git_FOUND AND KIS_SDK_RESOLVE_PACKAGES)
+        message(FATAL_ERROR "[ERROR] Git is required...")
+    endif()
+endfunction()
+
+# ==============================================================================
+#           DIAGNOSTIC UTILITIES
+# ==============================================================================
 function(kis_dump_cache_variables)
+    if(NOT KIS_DIAGNOSTIC_MODE) 
+    return() 
+    endif()
     message(STATUS "\n=== KIS Cache Variables ===")
-    
     get_cmake_property(cache_vars CACHE_VARIABLES)
+    list(SORT cache_vars)
     foreach(var ${cache_vars})
         if(var MATCHES "^KIS_")
             message(STATUS "${var} = ${${var}}")
         endif()
     endforeach()
-    
     message(STATUS "===========================\n")
 endfunction()
 
-
-#
-# kis_check_cache_staleness()
-#
-# Checks if cache might have stale values by comparing to current file.
-# Warns if sdk_options.cmake was modified after last configure.
-#
-function(kis_check_cache_staleness)
-    set(options_file "${CMAKE_CURRENT_SOURCE_DIR}/kis_build_system/modules/sdk_options.cmake")
-    set(cache_file "${CMAKE_BINARY_DIR}/CMakeCache.txt")
+function(kis_print_dependency_summary)
+    message(STATUS "\n=== Dependency Summary ===")
     
-    if(EXISTS "${options_file}" AND EXISTS "${cache_file}")
-        file(TIMESTAMP "${options_file}" options_time)
-        file(TIMESTAMP "${cache_file}" cache_time)
-        
-        if(options_time GREATER cache_time)
-            kis_collect_warning("Cache Staleness: sdk_options.cmake modified after last configure. Recommend clean build: rm -rf build/ && cmake --preset sdk-base")
-        endif()
+    kis_state_get_tpl_dependencies(third_party_deps)
+    if(third_party_deps)
+        list(LENGTH third_party_deps num_deps)
+        message(STATUS "\nThird-Party Dependencies (${num_deps}):")
+        foreach(dep_entry ${third_party_deps})
+            string(REPLACE "|||" ";" dep_parts "${dep_entry}")
+            list(GET dep_parts 0 dep_name)
+            list(GET dep_parts 2 dep_tag) # Correct index
+            
+            if(dep_tag)
+                message(STATUS "  • ${dep_name} @ ${dep_tag}")
+            else()
+                message(STATUS "  • ${dep_name}")
+            endif()
+        endforeach()
     endif()
+    
+    kis_state_get_all_package_paths(sdk_packages)
+    if(sdk_packages)
+        list(LENGTH sdk_packages pkg_count)
+        message(STATUS "\nFirst-Party Packages: ${pkg_count}")
+    endif()
+    
+    message(STATUS "========================\n")
 endfunction()

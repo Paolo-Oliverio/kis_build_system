@@ -120,6 +120,17 @@ endif()
 
 list(REMOVE_DUPLICATES KIS_ACTIVE_FEATURES)
 
+#
+# --- THIS IS THE FIX ---
+#
+# Create a single, unified list of all active tags (platform + features)
+# for the package validation function to use.
+#
+set(KIS_ACTIVE_TAGS ${KIS_PLATFORM_TAGS})
+list(APPEND KIS_ACTIVE_TAGS ${KIS_ACTIVE_FEATURES})
+list(REMOVE_DUPLICATES KIS_ACTIVE_TAGS)
+# --- END OF FIX ---
+
 # --- 5. Display Configuration ---
 message(STATUS "Configuring for Platform: ${KIS_PLATFORM_ID}")
 message(STATUS "--> Platform tags (filtering): ${KIS_PLATFORM_TAGS}")

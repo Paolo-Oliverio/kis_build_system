@@ -9,20 +9,31 @@ get_filename_component(KIS_BUILD_SYSTEM_MODULE_PATH "${CMAKE_CURRENT_LIST_FILE}"
 list(APPEND CMAKE_MODULE_PATH "${KIS_BUILD_SYSTEM_MODULE_PATH}")
 
 # --- Include all build system components ---
-include(utils)  # Load utility functions first
+include(utils)                  # Load utility functions first
+
+# Dependency Handling
+include(first_party_deps)       # Functions for handling KIS package dependencies
+include(third_party_deps)       # Functions for FetchContent and third-party libs
+include(dependency_linking)     # The deferred linking system
+
+# Package Discovery and Configuration
+include(package_discovery)      # Finds packages on disk
+include(imported_targets)       # Creates IMPORTED targets for variant fallbacks
+include(package_configuration)  # Configures/builds/imports packages and links them
+
+# Core Build System Infrastructure
 include(components)
-include(dependencies)
 include(dependency_resolution)
 include(diagnostics)
-include(discovery)
 include(env_setup)
 include(installation)
 include(packaging)
 include(paths)
 include(platforms)
-include(sdk_variants)  # NEW: Configuration variant system
+include(sdk_variants)
 include(targets)
 include(presets_logic)
+include(manifest_validation)
 # Note: platform_setup.cmake is NOT included here, it's a superbuild-only setup script.
 
 # --- Provide a consistent target for FetchContent ---

@@ -12,7 +12,7 @@
 # kis_compute_package_fingerprint
 #
 # Computes a fingerprint for a package based on:
-#   1. Manifest file content (kis.package.cmake)
+#   1. Manifest file content (kis.package.json)
 #   2. CMakeLists.txt modification time
 #   3. Source file count (to detect new/deleted files)
 #   4. Header file count
@@ -24,7 +24,7 @@ function(kis_compute_package_fingerprint package_path out_fingerprint_var)
     set(fingerprint_parts "")
     
     # 1. Manifest content hash (most important - tracks dependency changes)
-    set(manifest_file "${package_path}/kis.package.cmake")
+    set(manifest_file "${package_path}/kis.package.json")
     if(EXISTS "${manifest_file}")
         file(READ "${manifest_file}" manifest_content)
         string(MD5 manifest_hash "${manifest_content}")

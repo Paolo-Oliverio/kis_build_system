@@ -16,6 +16,12 @@ function(setup_sdk_paths)
     
     include(GNUInstallDirs)
 
+    # --- DEFINE STANDARD PACKAGE LAYOUT ---
+    # These variables define the conventional directory structure within a KIS package.
+    set(KIS_PACKAGE_COMMON_SRC_DIR "main/src" CACHE INTERNAL "Conventional directory for common source files.")
+    set(KIS_PACKAGE_COMMON_INCLUDE_DIR "main/include" CACHE INTERNAL "Conventional directory for public header files.")
+    set(KIS_PACKAGE_PLATFORM_OVERRIDE_DIR "main/platform" CACHE INTERNAL "Conventional directory for platform-specific overrides.")
+
     # --- DEFINE INSTALL PATHS ---
     # Platform-specific base paths (used for DEFAULT packages)
     set(KIS_INSTALL_LIBDIR_PLATFORM "lib/${KIS_PLATFORM_ID}" CACHE INTERNAL "")

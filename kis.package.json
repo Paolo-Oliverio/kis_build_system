@@ -1,0 +1,11 @@
+{
+  "name": "kis_build_system",
+  "version": "0.1.0",
+  "description": "The kis build system package.",
+  "type": "INTERFACE",
+  "abi": {
+    "variant": "ABI_INVARIANT"
+  },
+  "platform": {},
+  "dependencies": {}
+}

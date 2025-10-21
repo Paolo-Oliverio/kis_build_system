@@ -4,27 +4,32 @@
 # These helpers reduce duplication and centralize commonly-used patterns.
 
 #
+# kis_get_package_name_from_path
+#
+# Extracts the package name from a full package path or manifest path.
+#
+function(kis_get_package_name_from_path path out_name_var)
+    # If path is a file, get its directory first
+    if(NOT IS_DIRECTORY "${path}")
+        get_filename_component(path "${path}" DIRECTORY)
+    endif()
+    
+    get_filename_component(pkg_name "${path}" NAME)
+    set(${out_name_var} ${pkg_name} PARENT_SCOPE)
+endfunction()
+
+#
 # kis_regex_escape
 #
 # Escapes all regex metacharacters in a string for safe use in
 # CMake's MATCHES or string(REGEX ...) operations.
 #
-# Example:
-#   kis_regex_escape(escaped "https://github.com/user/repo.git")
-#   # escaped => "https://github\\.com/user/repo\\.git"
-#
 function(kis_regex_escape OUTPUT_VAR INPUT_STRING)
-    # Must escape backslash first or subsequent replacements will double-escape it.
     set(result "${INPUT_STRING}")
-
-    # Order matters: escape '\' before everything else.
     string(REPLACE "\\" "\\\\" result "${result}")
-
-    # Now escape all other regex metacharacters.
     foreach(char "." "*" "+" "?" "^" "$" "|" "(" ")" "[" "]" "{" "}")
         string(REPLACE "${char}" "\\${char}" result "${result}")
     endforeach()
-
     set(${OUTPUT_VAR} "${result}" PARENT_SCOPE)
 endfunction()
 
@@ -32,13 +37,6 @@ endfunction()
 # kis_is_url_trusted
 #
 # Checks if a URL starts with any of the trusted prefixes.
-# Returns TRUE or FALSE via the OUTPUT_VAR.
-#
-# Usage:
-#   kis_is_url_trusted(is_safe "https://github.com/Paolo-Oliverio/repo.git" "${KIS_TRUSTED_URL_PREFIXES}")
-#   if(is_safe)
-#       # proceed
-#   endif()
 #
 function(kis_is_url_trusted OUTPUT_VAR URL PREFIX_LIST)
     set(result FALSE)
@@ -54,40 +52,61 @@ endfunction()
 
 
 #
-# kis_message_fatal_actionable
+# kis_message_fatal_actionable (MACRO)
 #
-# Formats and prints a fatal error message with a clear structure:
-# emoji + title, detailed message, and actionable hints.
+# Formats and prints a fatal error message with a clear structure.
+# In test mode, it sets a variable instead of halting.
 #
-# Usage:
-#   kis_message_fatal_actionable(
-#       "Security Error: Untrusted URL"
-#       "The package URL is not in the trusted list."
-#       "Add the prefix to KIS_TRUSTED_URL_PREFIXES in sdk_options.cmake"
-#   )
-#
-function(kis_message_fatal_actionable TITLE MESSAGE HINT)
-    message(FATAL_ERROR
-        "\n[ERROR] ${TITLE}\n"
-        "  ${MESSAGE}\n"
-        "  \n"
-        "  [SOLUTION] How to fix:\n"
-        "     ${HINT}\n"
-    )
-endfunction()
+macro(kis_message_fatal_actionable TITLE MESSAGE HINT)
+    cmake_parse_arguments(ARG "" "PACKAGE;FILE" "" ${ARGN})
+
+    set(context "")
+    if(ARG_PACKAGE)
+        string(APPEND context "[Package: ${ARG_PACKAGE}] ")
+    endif()
+    if(ARG_FILE)
+        string(APPEND context "[File: ${ARG_FILE}]")
+    endif()
+
+    if(context)
+        set(TITLE "${context} ${TITLE}")
+    endif()
+    
+    if(KIS_TESTING_MODE)
+        set(KIS_TEST_LAST_ERROR "FATAL: ${TITLE}\n  ${MESSAGE}\n  Hint: ${HINT}")
+    else()
+        message(FATAL_ERROR
+            "\n[ERROR] ${TITLE}\n"
+            "  ${MESSAGE}\n"
+            "  \n"
+            "  [SOLUTION] How to fix:\n"
+            "     ${HINT}\n"
+        )
+    endif()
+endmacro()
 
 
 #
-# kis_message_warning_actionable
+# kis_message_warning_actionable (MACRO)
 #
 # Similar to kis_message_fatal_actionable but for warnings.
-# Collects warnings for summary display at end of configuration.
 #
-function(kis_message_warning_actionable TITLE MESSAGE HINT)
-    # Collect for summary
-    kis_collect_warning("${TITLE}" "${MESSAGE}" "${HINT}")
+macro(kis_message_warning_actionable TITLE MESSAGE HINT)
+    cmake_parse_arguments(ARG "" "PACKAGE;FILE" "" ${ARGN})
+
+    set(context "")
+    if(ARG_PACKAGE)
+        string(APPEND context "[Package: ${ARG_PACKAGE}] ")
+    endif()
+    if(ARG_FILE)
+        string(APPEND context "[File: ${ARG_FILE}]")
+    endif()
     
-    # Also print immediately for real-time feedback
+    if(context)
+        set(TITLE "${context} ${TITLE}")
+    endif()
+
+    kis_collect_warning("${TITLE}" "${MESSAGE}" "${HINT}")
     message(WARNING
         "\n[WARNING] ${TITLE}\n"
         "  ${MESSAGE}\n"
@@ -95,13 +114,12 @@ function(kis_message_warning_actionable TITLE MESSAGE HINT)
         "  [TIP] Suggestion:\n"
         "     ${HINT}\n"
     )
-endfunction()
+endmacro()
 
 #
 # kis_message_verbose
 #
 # Prints a STATUS message only if KIS_VERBOSE_BUILD is enabled.
-# Use this for detailed logging that clutters normal builds.
 #
 function(kis_message_verbose)
     if(KIS_VERBOSE_BUILD)
@@ -113,7 +131,6 @@ endfunction()
 # kis_message_info
 #
 # Prints an important STATUS message (always shown).
-# Use for key information users should see.
 #
 function(kis_message_info)
     message(STATUS ${ARGN})
@@ -124,10 +141,6 @@ endfunction()
 # kis_list_to_string
 #
 # Converts a CMake list to a human-readable string with a separator.
-# Useful for debug output.
-#
-# Usage:
-#   kis_list_to_string(output_str "${my_list}" ", ")
 #
 function(kis_list_to_string OUTPUT_VAR INPUT_LIST SEPARATOR)
     string(REPLACE ";" "${SEPARATOR}" result "${INPUT_LIST}")
@@ -136,68 +149,9 @@ endfunction()
 
 
 #
-# kis_parse_triplet_list
-#
-# Parses a list of triplets (name;url;tag format) and extracts them.
-# Used for PACKAGE_DEPENDENCIES parsing.
-#
-# Usage:
-#   kis_parse_triplet_list(parsed_list "${PACKAGE_DEPENDENCIES}")
-#   # parsed_list contains: name1 url1 tag1 name2 url2 tag2 ...
-#
-function(kis_parse_triplet_list OUTPUT_VAR INPUT_LIST CONTEXT_NAME)
-    set(result "")
-    list(LENGTH INPUT_LIST num_items)
-    set(i 0)
-    
-    while(i LESS num_items)
-        list(GET INPUT_LIST ${i} item_name)
-        math(EXPR i "${i} + 1")
-        
-        # Skip if it looks like a URL (malformed entry)
-        if(item_name MATCHES "^https?://")
-            kis_collect_warning("Skipping malformed entry in ${CONTEXT_NAME}: '${item_name}' looks like a URL")
-            continue()
-        endif()
-        
-        # Get URL
-        set(item_url "")
-        if(i LESS num_items)
-            list(GET INPUT_LIST ${i} potential_url)
-            if(potential_url MATCHES "^https?://")
-                set(item_url "${potential_url}")
-                math(EXPR i "${i} + 1")
-            endif()
-        endif()
-        
-        # Get TAG
-        set(item_tag "")
-        if(i LESS num_items AND item_url)
-            list(GET INPUT_LIST ${i} item_tag)
-            math(EXPR i "${i} + 1")
-        endif()
-        
-        # Validate we have all three components
-        if(item_url AND item_tag)
-            list(APPEND result "${item_name}" "${item_url}" "${item_tag}")
-        elseif(NOT item_url)
-            # Could be old-style format (just names), include name only
-            list(APPEND result "${item_name}")
-        endif()
-    endwhile()
-    
-    set(${OUTPUT_VAR} ${result} PARENT_SCOPE)
-endfunction()
-
-
-#
 # kis_build_override_map_parse
 #
 # Parses the KIS_DEPENDENCY_OVERRIDES variable into separate key/value lists.
-# Returns map_keys and map_values via output variables.
-#
-# Usage:
-#   kis_build_override_map_parse(keys_out values_out)
 #
 function(kis_build_override_map_parse KEYS_OUTPUT VALUES_OUTPUT)
     if(NOT DEFINED KIS_DEPENDENCY_OVERRIDES)
@@ -232,155 +186,173 @@ function(kis_build_override_map_parse KEYS_OUTPUT VALUES_OUTPUT)
     set(${VALUES_OUTPUT} ${values} PARENT_SCOPE)
 endfunction()
 
+# --- Helper macro to parse an array of strings with robust error handling ---
+macro(_json_get_array PARENT_VAR JSON_STRING KEY)
+    string(JSON arr_str ERROR_VARIABLE get_err GET "${JSON_STRING}" "${KEY}")
+    
+    if(NOT get_err)
+        string(JSON arr_type TYPE "${arr_str}")
+        if(NOT arr_type STREQUAL "ARRAY")
+            if(NOT arr_str STREQUAL "")
+                kis_get_package_name_from_path("${PACKAGE_PATH}" pkg_name)
+                kis_message_fatal_actionable("Invalid Manifest: Not an Array" "The value for key '${KEY}' must be a JSON array, but is a '${arr_type}'." "Value found was: '${arr_str}'\n  Example of a correct array: \"${KEY}\": [\"value1\", \"value2\"]" PACKAGE ${pkg_name} FILE ${manifest_file})
+            endif()
+        else()
+            string(JSON len LENGTH "${arr_str}")
+            if(len GREATER 0)
+                math(EXPR last_idx "${len} - 1")
+                set(list_val "")
+                foreach(i RANGE ${last_idx})
+                    string(JSON item ERROR_VARIABLE item_err GET "${arr_str}" ${i})
+                    if(item_err)
+                        kis_get_package_name_from_path("${PACKAGE_PATH}" pkg_name)
+                        kis_message_fatal_actionable("Invalid Manifest: Array Item Parse Error" "Could not parse item at index ${i} for key '${KEY}'. Reason: ${item_err}" "Array content being parsed: ${arr_str}" PACKAGE ${pkg_name} FILE ${manifest_file})
+                    else()
+                        list(APPEND list_val "${item}")
+                    endif()
+                endforeach()
+                set(${PARENT_VAR} "${list_val}")
+            endif()
+        endif()
+    endif()
+endmacro()
 
 #
-# kis_read_package_manifest
+# kis_read_package_manifest_json (MACRO)
 #
-# Reads a package's kis.package.cmake file and extracts all metadata fields.
-# Returns data via output variables with MANIFEST_ prefix.
+# Reads a package's kis.package.json file and extracts all metadata fields
+# into MANIFEST_* variables in the CALLER'S scope.
 #
-# Usage:
-#   kis_read_package_manifest("/path/to/package")
-#   # Sets variables in PARENT_SCOPE:
-#   #   MANIFEST_NAME, MANIFEST_VERSION, MANIFEST_DESCRIPTION,
-#   #   MANIFEST_PLATFORMS, MANIFEST_PLATFORM_TAGS, MANIFEST_PLATFORM_EXCLUDES,
-#   #   MANIFEST_DEPENDENCIES, MANIFEST_OVERRIDES
-#
-function(kis_read_package_manifest PACKAGE_PATH)
-    set(manifest_file "${PACKAGE_PATH}/kis.package.cmake")
+macro(kis_read_package_manifest_json PACKAGE_PATH)
+    set(manifest_file "${PACKAGE_PATH}/kis.package.json")
     
     if(NOT EXISTS "${manifest_file}")
         message(FATAL_ERROR "Package manifest not found: ${manifest_file}")
     endif()
+
+    file(READ "${manifest_file}" manifest_content)
     
-    # Clear all output variables
-    unset(PACKAGE_NAME)
-    unset(PACKAGE_VERSION)
-    unset(PACKAGE_DESCRIPTION)
-    unset(PACKAGE_PLATFORMS)
-    unset(PACKAGE_PLATFORM_TAGS)
-    unset(PACKAGE_PLATFORM_EXCLUDES)
-    unset(PACKAGE_REQUIRES_TAGS)
-    unset(PACKAGE_EXCLUDES_TAGS)
-    unset(PACKAGE_DEPENDENCIES)
-    unset(PACKAGE_OVERRIDES)
-    unset(PACKAGE_FEATURES)
-    unset(PACKAGE_FEATURE_REQUIREMENTS)
-    unset(PACKAGE_ABI_VARIANT)
-    unset(PACKAGE_CONFIG_SUFFIX)
-    
-    # Include the manifest (sets PACKAGE_* variables in this scope)
-    include("${manifest_file}")
-    
-    # Export to parent scope with MANIFEST_ prefix
-    if(DEFINED PACKAGE_NAME)
-        set(MANIFEST_NAME "${PACKAGE_NAME}" PARENT_SCOPE)
+    if(manifest_content MATCHES "^\\xef\\xbb\\bf")
+        string(SUBSTRING "${manifest_content}" 3 -1 manifest_content)
     endif()
-    if(DEFINED PACKAGE_VERSION)
-        set(MANIFEST_VERSION "${PACKAGE_VERSION}" PARENT_SCOPE)
+
+    set(manifest_vars NAME VERSION TYPE DESCRIPTION CATEGORY SEARCH_TAGS OVERRIDES PLATFORMS PLATFORM_TAGS PLATFORM_EXCLUDES REQUIRES_TAGS EXCLUDES_TAGS ABI_VARIANT SUPPORTED_VARIANTS CUSTOM_VARIANTS KIS_DEPENDENCIES TPL_DEPENDENCIES FEATURES)
+    foreach(var ${manifest_vars})
+        unset(MANIFEST_${var})
+    endforeach()
+
+    # First, check if the content is a valid JSON object at all.
+    string(JSON content_type ERROR_VARIABLE type_err TYPE "${manifest_content}")
+    if(type_err OR NOT content_type STREQUAL "OBJECT")
+        kis_get_package_name_from_path("${PACKAGE_PATH}" pkg_name)
+        kis_message_fatal_actionable("Invalid JSON" "Manifest content is not a valid JSON object. Reason: ${type_err}" "Ensure the file starts with '{' and ends with '}' and contains valid JSON." PACKAGE ${pkg_name} FILE ${manifest_file})
+    else()
+        # Use the robust "try-get and check error" pattern for each field.
+        string(JSON val ERROR_VARIABLE err GET "${manifest_content}" "name")
+        if(NOT err)
+            set(MANIFEST_NAME "${val}")
+        endif()
+        
+        string(JSON val ERROR_VARIABLE err GET "${manifest_content}" "version")
+        if(NOT err)
+            set(MANIFEST_VERSION "${val}")
+        endif()
+
+        string(JSON val ERROR_VARIABLE err GET "${manifest_content}" "type")
+        if(NOT err)
+            set(MANIFEST_TYPE "${val}")
+        endif()
+
+        string(JSON val ERROR_VARIABLE err GET "${manifest_content}" "description")
+        if(NOT err)
+            set(MANIFEST_DESCRIPTION "${val}")
+        endif()
+
+        string(JSON val ERROR_VARIABLE err GET "${manifest_content}" "category")
+        if(NOT err)
+            set(MANIFEST_CATEGORY "${val}")
+        endif()
+
+        _json_get_array(MANIFEST_SEARCH_TAGS "${manifest_content}" "searchTags")
+        _json_get_array(MANIFEST_OVERRIDES "${manifest_content}" "overrides")
+        _json_get_array(MANIFEST_FEATURES "${manifest_content}" "features")
+
+        string(JSON platform_obj ERROR_VARIABLE err GET "${manifest_content}" "platform")
+        if(NOT err)
+            _json_get_array(MANIFEST_PLATFORMS "${platform_obj}" "platforms")
+            _json_get_array(MANIFEST_PLATFORM_TAGS "${platform_obj}" "tags")
+            _json_get_array(MANIFEST_PLATFORM_EXCLUDES "${platform_obj}" "excludes")
+            _json_get_array(MANIFEST_REQUIRES_TAGS "${platform_obj}" "requiresTags")
+            _json_get_array(MANIFEST_EXCLUDES_TAGS "${platform_obj}" "excludesTags")
+        endif()
+
+        string(JSON abi_obj ERROR_VARIABLE err GET "${manifest_content}" "abi")
+        if(NOT err)
+            string(JSON val ERROR_VARIABLE err_v GET "${abi_obj}" "variant")
+            if(NOT err_v)
+                set(MANIFEST_ABI_VARIANT "${val}")
+            endif()
+            _json_get_array(MANIFEST_SUPPORTED_VARIANTS "${abi_obj}" "supportedVariants")
+            string(JSON val ERROR_VARIABLE err_c GET "${abi_obj}" "customVariants")
+            if(NOT err_c)
+                set(MANIFEST_CUSTOM_VARIANTS "${val}")
+            endif()
+        endif()
+
+        string(JSON deps_obj ERROR_VARIABLE err GET "${manifest_content}" "dependencies")
+        if(NOT err)
+            string(JSON val ERROR_VARIABLE err_k GET "${deps_obj}" "kis")
+            if(NOT err_k)
+                set(MANIFEST_KIS_DEPENDENCIES "${val}")
+            endif()
+            string(JSON val ERROR_VARIABLE err_t GET "${deps_obj}" "thirdParty")
+            if(NOT err_t)
+                set(MANIFEST_TPL_DEPENDENCIES "${val}")
+            endif()
+        endif()
     endif()
-    if(DEFINED PACKAGE_DESCRIPTION)
-        set(MANIFEST_DESCRIPTION "${PACKAGE_DESCRIPTION}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_PLATFORMS)
-        set(MANIFEST_PLATFORMS "${PACKAGE_PLATFORMS}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_PLATFORM_TAGS)
-        set(MANIFEST_PLATFORM_TAGS "${PACKAGE_PLATFORM_TAGS}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_PLATFORM_EXCLUDES)
-        set(MANIFEST_PLATFORM_EXCLUDES "${PACKAGE_PLATFORM_EXCLUDES}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_REQUIRES_TAGS)
-        set(MANIFEST_REQUIRES_TAGS "${PACKAGE_REQUIRES_TAGS}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_EXCLUDES_TAGS)
-        set(MANIFEST_EXCLUDES_TAGS "${PACKAGE_EXCLUDES_TAGS}" PARENT_SCOPE)
-    endif()
-    # New simplified fields
-    if(DEFINED PACKAGE_FEATURES)
-        set(MANIFEST_FEATURES "${PACKAGE_FEATURES}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_FEATURE_REQUIREMENTS)
-        # Backwards-compat: export legacy feature requirements under MANIFEST_FEATURES
-        set(MANIFEST_FEATURES "${PACKAGE_FEATURE_REQUIREMENTS}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_ABI_VARIANT)
-        set(MANIFEST_ABI_VARIANT "${PACKAGE_ABI_VARIANT}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_CONFIG_SUFFIX)
-        set(MANIFEST_CONFIG_SUFFIX "${PACKAGE_CONFIG_SUFFIX}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_DEPENDENCIES)
-        set(MANIFEST_DEPENDENCIES "${PACKAGE_DEPENDENCIES}" PARENT_SCOPE)
-    endif()
-    if(DEFINED PACKAGE_OVERRIDES)
-        set(MANIFEST_OVERRIDES "${PACKAGE_OVERRIDES}" PARENT_SCOPE)
-    endif()
-endfunction()
+endmacro()
 
 
 #
 # kis_validate_package_platform
 #
-# Validates that a package's platform constraints are satisfied by the current build configuration.
-# Now supports both platform tags AND build configuration tags (tools, editor, demo, etc.)
-# Checks PACKAGE_PLATFORMS, PACKAGE_PLATFORM_TAGS, PACKAGE_PLATFORM_EXCLUDES (legacy).
-# Also checks PACKAGE_REQUIRES_TAGS and PACKAGE_EXCLUDES_TAGS (new unified system).
-#
-# Parameters:
-#   PACKAGE_NAME - Name of the package being validated
-#   PACKAGE_PATH - Path to the package directory
-#   CURRENT_PLATFORM - Current KIS_PLATFORM value
-#   CURRENT_TAGS - Current KIS_ACTIVE_TAGS list (platform + build tags)
-#
-# Returns: Sets IS_COMPATIBLE to TRUE or FALSE in PARENT_SCOPE
-#          Sets ERROR_MESSAGE if incompatible (for user feedback)
-#
 function(kis_validate_package_platform PACKAGE_NAME PACKAGE_PATH CURRENT_PLATFORM CURRENT_TAGS OUTPUT_COMPATIBLE OUTPUT_ERROR)
-    # Read the manifest
-    kis_read_package_manifest("${PACKAGE_PATH}")
+    kis_read_package_manifest_json("${PACKAGE_PATH}")
     
     set(is_compatible TRUE)
     set(error_msg "")
     
-    # === LEGACY PLATFORM FIELDS (backward compatibility) ===
-    
-    # Check 1: PACKAGE_PLATFORM_EXCLUDES (explicit exclusions)
     if(DEFINED MANIFEST_PLATFORM_EXCLUDES)
-        # Check if current platform is explicitly excluded
         list(FIND MANIFEST_PLATFORM_EXCLUDES "${CURRENT_PLATFORM}" platform_excluded_idx)
         if(NOT platform_excluded_idx EQUAL -1)
             set(is_compatible FALSE)
             kis_list_to_string(excluded_str "${MANIFEST_PLATFORM_EXCLUDES}" ", ")
-            set(error_msg "Package '${PACKAGE_NAME}' explicitly excludes platform: ${CURRENT_PLATFORM}\n  Excluded platforms: ${excluded_str}")
+            set(error_msg "Package explicitly excludes platform: ${CURRENT_PLATFORM}\n  Excluded platforms: ${excluded_str}")
         endif()
         
-        # Check if any current tags are excluded
         if(is_compatible)
             foreach(tag ${CURRENT_TAGS})
                 list(FIND MANIFEST_PLATFORM_EXCLUDES "${tag}" tag_excluded_idx)
                 if(NOT tag_excluded_idx EQUAL -1)
                     set(is_compatible FALSE)
                     kis_list_to_string(excluded_str "${MANIFEST_PLATFORM_EXCLUDES}" ", ")
-                    set(error_msg "Package '${PACKAGE_NAME}' explicitly excludes platform tag: ${tag}\n  Excluded platforms: ${excluded_str}")
+                    set(error_msg "Package explicitly excludes platform tag: ${tag}\n  Excluded platforms: ${excluded_str}")
                     break()
                 endif()
             endforeach()
         endif()
     endif()
     
-    # Check 2: PACKAGE_PLATFORMS (must match at least one)
     if(is_compatible AND DEFINED MANIFEST_PLATFORMS)
         list(FIND MANIFEST_PLATFORMS "${CURRENT_PLATFORM}" platform_found_idx)
         if(platform_found_idx EQUAL -1)
             set(is_compatible FALSE)
             kis_list_to_string(required_str "${MANIFEST_PLATFORMS}" ", ")
-            set(error_msg "Package '${PACKAGE_NAME}' requires one of these platforms: ${required_str}\n  Current platform: ${CURRENT_PLATFORM}")
+            set(error_msg "Package requires one of these platforms: ${required_str}\n  Current platform: ${CURRENT_PLATFORM}")
         endif()
     endif()
     
-    # Check 3: PACKAGE_PLATFORM_TAGS (must have at least one matching tag)
     if(is_compatible AND DEFINED MANIFEST_PLATFORM_TAGS)
         set(has_matching_tag FALSE)
         foreach(required_tag ${MANIFEST_PLATFORM_TAGS})
@@ -395,13 +367,10 @@ function(kis_validate_package_platform PACKAGE_NAME PACKAGE_PATH CURRENT_PLATFOR
             set(is_compatible FALSE)
             kis_list_to_string(required_tags_str "${MANIFEST_PLATFORM_TAGS}" ", ")
             kis_list_to_string(current_tags_str "${CURRENT_TAGS}" ", ")
-            set(error_msg "Package '${PACKAGE_NAME}' requires at least one of these platform tags: ${required_tags_str}\n  Current tags: ${current_tags_str}")
+            set(error_msg "Package requires at least one of these platform tags: ${required_tags_str}\n  Current tags: ${current_tags_str}")
         endif()
     endif()
     
-    # === NEW UNIFIED TAG SYSTEM ===
-    
-    # Check 4: PACKAGE_EXCLUDES_TAGS (unified exclusions)
     if(is_compatible AND DEFINED MANIFEST_EXCLUDES_TAGS)
         foreach(excluded_tag ${MANIFEST_EXCLUDES_TAGS})
             list(FIND CURRENT_TAGS "${excluded_tag}" tag_excluded_idx)
@@ -409,13 +378,12 @@ function(kis_validate_package_platform PACKAGE_NAME PACKAGE_PATH CURRENT_PLATFOR
                 set(is_compatible FALSE)
                 kis_list_to_string(excluded_str "${MANIFEST_EXCLUDES_TAGS}" ", ")
                 kis_list_to_string(current_str "${CURRENT_TAGS}" ", ")
-                set(error_msg "Package '${PACKAGE_NAME}' excludes tag: ${excluded_tag}\n  Excluded tags: ${excluded_str}\n  Current tags: ${current_str}")
+                set(error_msg "Package excludes tag: ${excluded_tag}\n  Excluded tags: ${excluded_str}\n  Current tags: ${current_str}")
                 break()
             endif()
         endforeach()
     endif()
     
-    # Check 5: PACKAGE_REQUIRES_TAGS (must have ALL required tags)
     if(is_compatible AND DEFINED MANIFEST_REQUIRES_TAGS)
         set(missing_tags "")
         foreach(required_tag ${MANIFEST_REQUIRES_TAGS})
@@ -430,11 +398,10 @@ function(kis_validate_package_platform PACKAGE_NAME PACKAGE_PATH CURRENT_PLATFOR
             kis_list_to_string(missing_str "${missing_tags}" ", ")
             kis_list_to_string(required_str "${MANIFEST_REQUIRES_TAGS}" ", ")
             kis_list_to_string(current_str "${CURRENT_TAGS}" ", ")
-            set(error_msg "Package '${PACKAGE_NAME}' requires ALL of these tags: ${required_str}\n  Missing tags: ${missing_str}\n  Current tags: ${current_str}\n\n  [TIP] To enable missing tags:\n     - Use preset: cmake --preset dev-full\n     - Or set manually: -DKIS_BUILD_TAGS=\"${required_str}\"\n     - Or modify CMakePresets.json to add tags")
+            set(error_msg "Package requires ALL of these tags: ${required_str}\n  Missing tags: ${missing_str}\n  Current tags: ${current_str}\n\n  [TIP] To enable missing tags:\n     - Use preset: cmake --preset dev-full\n     - Or set manually: -DKIS_BUILD_TAGS=\"${required_str}\"\n     - Or modify CMakePresets.json to add tags")
         endif()
     endif()
     
-    # Return results
     set(${OUTPUT_COMPATIBLE} ${is_compatible} PARENT_SCOPE)
     set(${OUTPUT_ERROR} "${error_msg}" PARENT_SCOPE)
 endfunction()
@@ -444,18 +411,10 @@ endfunction()
 # kis_get_package_platform_preference
 #
 # Determines the preferred platform subdirectory for a package based on its manifest.
-# Returns empty string if package has no platform preference (should go in root kis_packages/).
-#
-# Usage:
-#   kis_get_package_platform_preference(preferred_platform "/path/to/package")
-#   # Returns: "windows", "android", "linux", or "" for common packages
 #
 function(kis_get_package_platform_preference OUTPUT_VAR PACKAGE_PATH)
-    kis_read_package_manifest("${PACKAGE_PATH}")
-    
+    kis_read_package_manifest_json("${PACKAGE_PATH}")
     set(result "")
-    
-    # If package specifies exactly one platform, use that as preference
     if(DEFINED MANIFEST_PLATFORMS)
         list(LENGTH MANIFEST_PLATFORMS num_platforms)
         if(num_platforms EQUAL 1)
@@ -463,6 +422,5 @@ function(kis_get_package_platform_preference OUTPUT_VAR PACKAGE_PATH)
             set(result "${single_platform}")
         endif()
     endif()
-    
     set(${OUTPUT_VAR} "${result}" PARENT_SCOPE)
 endfunction()

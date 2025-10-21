@@ -2,9 +2,7 @@
 #
 # Exports dependency relationships to DOT format for visualization
 
-# Initialize graph data collection
-set_property(GLOBAL PROPERTY KIS_GRAPH_NODES "")
-set_property(GLOBAL PROPERTY KIS_GRAPH_EDGES "")
+# NOTE: Initialization is now handled by kis_state_init()
 
 #
 # kis_graph_add_node
@@ -19,15 +17,15 @@ function(kis_graph_add_node node_name node_type node_platform)
         return()
     endif()
     
-    get_property(nodes GLOBAL PROPERTY KIS_GRAPH_NODES)
+    kis_state_get_graph_nodes(nodes)
     
     # Avoid duplicates
     if("${node_name}" IN_LIST nodes)
         return()
     endif()
     
-    list(APPEND nodes "${node_name}|${node_type}|${node_platform}")
-    set_property(GLOBAL PROPERTY KIS_GRAPH_NODES "${nodes}")
+    set(node_data "${node_name}|${node_type}|${node_platform}")
+    kis_state_add_graph_node("${node_data}")
 endfunction()
 
 #
@@ -44,7 +42,7 @@ function(kis_graph_add_edge from_node to_node edge_type)
         return()
     endif()
     
-    get_property(edges GLOBAL PROPERTY KIS_GRAPH_EDGES)
+    kis_state_get_graph_edges(edges)
     
     # Avoid duplicates
     set(edge_key "${from_node}->${to_node}")
@@ -54,8 +52,8 @@ function(kis_graph_add_edge from_node to_node edge_type)
         endif()
     endforeach()
     
-    list(APPEND edges "${edge_key}|${edge_type}")
-    set_property(GLOBAL PROPERTY KIS_GRAPH_EDGES "${edges}")
+    set(edge_data "${edge_key}|${edge_type}")
+    kis_state_add_graph_edge("${edge_data}")
 endfunction()
 
 #
@@ -68,8 +66,8 @@ function(kis_export_dependency_graph)
         return()
     endif()
     
-    get_property(nodes GLOBAL PROPERTY KIS_GRAPH_NODES)
-    get_property(edges GLOBAL PROPERTY KIS_GRAPH_EDGES)
+    kis_state_get_graph_nodes(nodes)
+    kis_state_get_graph_edges(edges)
     
     set(output_file "${CMAKE_BINARY_DIR}/dependency_graph.dot")
     
@@ -175,7 +173,7 @@ function(kis_export_dependency_graph)
     message(STATUS "[INFO] Install Graphviz:")
     message(STATUS "     Windows: choco install graphviz")
     message(STATUS "     macOS:   brew install graphviz")
-    message(STATUS "     Linux:   apt/yum install graphviz")
+    message(STATUS "     Linux:   sudo apt-get install graphviz / sudo yum install graphviz")
     message(STATUS "========================================")
     message(STATUS "")
 endfunction()

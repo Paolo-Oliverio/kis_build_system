@@ -1,5 +1,30 @@
 # cmake/templates/GenericPackageConfig.cmake.in
 
+# =============================================================================
+# KIS SDK ENVIRONMENT SETUP (Self-Correction Logic)
+# =============================================================================
+# This block ensures that the main KIS_SDK configuration is loaded, which is
+# responsible for setting up platform-specific CMAKE_PREFIX_PATH entries.
+# This makes it possible for a consumer to find_package() any KIS package
+# directly without needing to find_package(KIS_SDK) first.
+if(NOT KIS_SDK_CONFIG_LOADED)
+    # This package's config is at <prefix>/lib/cmake/<pkg_name>/<pkg_name>Config.cmake
+    # The SDK config is at <prefix>/lib/cmake/KIS_SDK/KIS_SDKConfig.cmake
+    # We can navigate from our location to find it.
+    get_filename_component(_package_cmake_dir "${CMAKE_CURRENT_LIST_DIR}" DIRECTORY)
+    set(_sdk_config_file "${_package_cmake_dir}/KIS_SDK/KIS_SDKConfig.cmake")
+
+    if(EXISTS "${_sdk_config_file}")
+        include("${_sdk_config_file}")
+        set(KIS_SDK_CONFIG_LOADED TRUE CACHE INTERNAL "Guard to prevent multiple SDK config loads")
+    else()
+        message(WARNING "Could not find the main KIS_SDK config file expected at '${_sdk_config_file}'. Transitive, platform-specific dependencies may not be found.")
+    endif()
+    unset(_sdk_config_file)
+    unset(_package_cmake_dir)
+endif()
+# =============================================================================
+
 @PACKAGE_INIT@
 
 set(PACKAGE_FIND_DEPENDENCIES "@PACKAGE_FIND_DEPENDENCIES@")
@@ -10,6 +35,10 @@ set(PACKAGE_FIND_DEPENDENCIES "@PACKAGE_FIND_DEPENDENCIES@")
 set(@PACKAGE_NAME@_category "@PACKAGE_CATEGORY@")
 set(@PACKAGE_NAME@_search_tags "@PACKAGE_SEARCH_TAGS@")
 
+# Find all dependencies.
+# NOTE: Third-party dependencies installed in platform/ABI-specific directories
+# (like lib/windows-x64/cmake/glfw3) are found via the CMAKE_PREFIX_PATH setup
+# in KIS_SDKConfig.cmake which adds these platform-specific paths.
 include(CMakeFindDependencyMacro)
 foreach(dep IN LISTS PACKAGE_FIND_DEPENDENCIES)
     find_dependency(${dep})
