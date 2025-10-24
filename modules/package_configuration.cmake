@@ -1,5 +1,5 @@
 # cmake/build_system/package_configuration.cmake
-# ... (top part of file is unchanged from Milestone 2) ...
+
 # ==============================================================================
 #           PHASE 1: PACKAGE CONFIGURATION
 # ==============================================================================
@@ -21,7 +21,9 @@ function(configure_discovered_packages)
         set(should_build TRUE)
         set(should_import FALSE)
         set(skip_reason "")
-        kis_read_package_manifest_json("${package_path}")
+        
+        kis_read_package_manifest_json(PACKAGE_PATH "${package_path}")
+        
         # ... (all the logic for should_build/should_import is unchanged) ...
         if(DEFINED MANIFEST_FEATURES)
             set(should_build FALSE)
@@ -66,18 +68,45 @@ function(configure_discovered_packages)
         endif()
         
         if(should_build)
-            # Add KIS dependencies to the central state
+            # Add KIS dependencies to the central state, respecting implicit conditions
             if(DEFINED MANIFEST_KIS_DEPENDENCIES)
                 string(JSON num_deps LENGTH "${MANIFEST_KIS_DEPENDENCIES}")
                 if(num_deps GREATER 0)
                     math(EXPR last_idx "${num_deps} - 1")
                     foreach(i RANGE ${last_idx})
                         string(JSON dep_obj GET "${MANIFEST_KIS_DEPENDENCIES}" ${i})
-                        kis_state_add_kis_dependency("${dep_obj}")
+                        
+                        set(is_active TRUE)
+                        string(JSON dep_scope_json ERROR_VARIABLE scope_err GET "${dep_obj}" "scope")
+                        if(NOT scope_err)
+                            set(dep_scopes "")
+                            string(JSON num_scopes LENGTH "${dep_scope_json}")
+                            math(EXPR last_scope_idx "${num_scopes} - 1")
+                            foreach(j RANGE ${last_scope_idx})
+                                string(JSON scope_item GET "${dep_scope_json}" ${j})
+                                list(APPEND dep_scopes ${scope_item})
+                            endforeach()
+                            
+                            list(LENGTH dep_scopes num_scopes_val)
+                            if(num_scopes_val EQUAL 1)
+                                list(GET dep_scopes 0 single_scope)
+                                if(single_scope STREQUAL "tests" AND NOT KIS_BUILD_TESTS)
+                                    set(is_active FALSE)
+                                elseif(single_scope STREQUAL "samples" AND NOT KIS_BUILD_SAMPLES)
+                                    set(is_active FALSE)
+                                elseif(single_scope STREQUAL "benchmarks" AND NOT KIS_BUILD_BENCHMARKS)
+                                    set(is_active FALSE)
+                                endif()
+                            endif()
+                        endif()
+
+                        if(is_active)
+                            kis_state_add_kis_dependency("${dep_obj}")
+                        endif()
                     endforeach()
                 endif()
             endif()
-            # Handle TPL dependencies using the refactored function
+            # Handle TPL dependencies using the refactored function which also has implicit conditions
             if(DEFINED MANIFEST_TPL_DEPENDENCIES)
                 kis_handle_third_party_dependencies("${package_name}" "${MANIFEST_TPL_DEPENDENCIES}")
             endif()
@@ -104,13 +133,18 @@ function(configure_discovered_packages)
             if(DEFINED MANIFEST_TYPE)
                 set(pkg_platform "common")
                 if(DEFINED MANIFEST_PLATFORMS) 
-                list(GET MANIFEST_PLATFORMS 0 pkg_platform) 
+                    list(GET MANIFEST_PLATFORMS 0 pkg_platform) 
                 endif()
                 kis_graph_add_node("${package_name}" "${MANIFEST_TYPE}" "${pkg_platform}")
             endif()
             set(source_dir ${package_path})
             set(binary_dir "${CMAKE_BINARY_DIR}/_deps/${package_name}-build")
+
+            # --- THE FIX: Create the context sandwich around add_subdirectory ---
+            set(_KIS_CTX_CURRENT_PACKAGE_ROOT "${package_path}") # Set context
             add_subdirectory(${source_dir} ${binary_dir})
+            unset(_KIS_CTX_CURRENT_PACKAGE_ROOT) # Unset context
+
             kis_profile_end("${package_name}" "configure")
         endif()
     endforeach()

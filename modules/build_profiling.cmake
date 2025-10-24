@@ -13,11 +13,17 @@ set_property(GLOBAL PROPERTY KIS_PROFILE_START_TIME "")
 # Initializes build profiling if enabled
 #
 function(kis_profile_init)
+    # Always clear stale profiling data from previous runs
+    set_property(GLOBAL PROPERTY KIS_PROFILE_ENTRIES "")
+    set_property(GLOBAL PROPERTY KIS_PROFILE_START_TIME "")
+    
     if(KIS_PROFILE_BUILD)
         set_property(GLOBAL PROPERTY KIS_PROFILE_ENABLED TRUE)
         string(TIMESTAMP start_time "%s")
         set_property(GLOBAL PROPERTY KIS_PROFILE_START_TIME "${start_time}")
         message(STATUS "[PROFILE] Build profiling enabled")
+    else()
+        set_property(GLOBAL PROPERTY KIS_PROFILE_ENABLED FALSE)
     endif()
 endfunction()
 
@@ -37,6 +43,7 @@ function(kis_profile_begin name phase)
     
     string(TIMESTAMP start_time "%s")
     set_property(GLOBAL PROPERTY "KIS_PROFILE_${name}_${phase}_START" "${start_time}")
+    message("CIAO2 ${start_time} ${name}|${phase}")
 endfunction()
 
 #
@@ -50,22 +57,23 @@ endfunction()
 function(kis_profile_end name phase)
     get_property(enabled GLOBAL PROPERTY KIS_PROFILE_ENABLED)
     if(NOT enabled)
+        message("CIAO")
         return()
     endif()
-    
     string(TIMESTAMP end_time "%s")
     
     get_property(start_time GLOBAL PROPERTY "KIS_PROFILE_${name}_${phase}_START")
     if(NOT start_time)
+        message("CIAO t")
         return()
     endif()
-    
     math(EXPR duration "${end_time} - ${start_time}")
-    
+    message("CIAO ${end_time} ${start_time} ${name}|${phase} ")
     # Store the entry
     get_property(entries GLOBAL PROPERTY KIS_PROFILE_ENTRIES)
     list(APPEND entries "${name}|${phase}|${duration}")
     set_property(GLOBAL PROPERTY KIS_PROFILE_ENTRIES "${entries}")
+    
 endfunction()
 
 #
@@ -123,12 +131,21 @@ function(kis_profile_report)
             list(APPEND new_package_times "${pkg_name}|${duration}")
         endif()
         
-        set(package_times "${new_package_times}")
-        
+        set(package_times ${new_package_times})
         # Track max for bar chart scaling
         if(duration GREATER max_duration)
             set(max_duration ${duration})
         endif()
+    endforeach()
+
+    set(max_duration 0)
+    foreach(pkg_time ${package_times})
+        string(REPLACE "|" ";" pkg_parts "${pkg_time}")
+        list(GET pkg_parts 1 duration)
+        if(duration GREATER max_duration)
+            set(max_duration ${duration})
+        endif()
+        
     endforeach()
     
     # Sort by duration (descending) - simple selection sort

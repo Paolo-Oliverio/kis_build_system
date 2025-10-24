@@ -6,33 +6,60 @@
 #
 # kis_add_component
 #
-# Internal helper function to avoid code duplication.
+# Internal helper function to avoid code duplication. It now uses the deferred linking system.
 #
 function(_kis_add_component COMPONENT_TYPE TARGET_NAME)
     set(options)
     set(oneValueArgs)
-    set(multiValueArgs SOURCES LINK_LIBRARIES)
+    set(multiValueArgs SOURCES PUBLIC_LINK_LIBRARIES PRIVATE_LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    # ==============================================================================
+    # THE NEW LOGIC: AUTOMATIC PARENT PACKAGE LINKING
+    # ==============================================================================
+    if(DEFINED _KIS_CTX_CURRENT_PACKAGE_ROOT)
+        # We are in a package context, so we can infer the parent library.
+        kis_read_package_manifest_json()
+
+        if(DEFINED MANIFEST_NAME AND (MANIFEST_TYPE STREQUAL "LIBRARY" OR MANIFEST_TYPE STREQUAL "INTERFACE"))
+            # If the parent is a library, automatically link it privately.
+            # Check if the user hasn't already added it.
+            list(FIND ARG_PRIVATE_LINK_LIBRARIES "${MANIFEST_NAME}" _index)
+            if(_index EQUAL -1)
+                list(APPEND ARG_PRIVATE_LINK_LIBRARIES "${MANIFEST_NAME}")
+                message(STATUS "  [${TARGET_NAME}] Automatically linking against parent package: ${MANIFEST_NAME}")
+            endif()
+        endif()
+    endif()
+    # ==============================================================================
 
     # Create the executable target
     add_executable(${TARGET_NAME} ${ARG_SOURCES})
 
     # Set properties for IDE organization and build behavior
     set_target_properties(${TARGET_NAME} PROPERTIES
-        # Group targets neatly in IDEs like Visual Studio and VS Code
         FOLDER "${COMPONENT_TYPE}/${PROJECT_NAME}"
     )
 
     if(NOT KIS_BUILD_COMPONENTS_IN_ALL)
-        # If the option is OFF, restore the old behavior.        
-        # It must be built explicitly or via a meta-target (e.g., 'all_tests').
         set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
     endif()
 
-    # Link libraries
-    target_link_libraries(${TARGET_NAME} PRIVATE ${ARG_LINK_LIBRARIES})
+    # Link dependencies from the manifest that are declared for this component's scope.
+    string(TOLOWER ${COMPONENT_TYPE} scope_name)
+    kis_link_from_manifest(TARGET ${TARGET_NAME} SCOPE ${scope_name})
 
-    # If the corresponding meta-target exists (in superbuild mode), add a dependency.
+    # Link any additional dependencies passed directly to this function.
+    # This now includes our automatically added parent package library.
+    kis_defer_link_dependencies(
+        TARGET ${TARGET_NAME}
+        SCOPE ${scope_name}
+        PUBLIC ${ARG_PUBLIC_LINK_LIBRARIES}
+        PRIVATE ${ARG_PRIVATE_LINK_LIBRARIES}
+        INTERFACE ${ARG_INTERFACE_LINK_LIBRARIES}
+    )
+
+    # If the corresponding meta-target exists, add a dependency.
     string(TOLOWER ${COMPONENT_TYPE} meta_target_name_suffix)
     set(meta_target_name "all_${meta_target_name_suffix}")
     if(TARGET ${meta_target_name})

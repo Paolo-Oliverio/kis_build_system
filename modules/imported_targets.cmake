@@ -71,7 +71,7 @@ function(_kis_create_imported_package_target package_name package_path base_vari
     endif()
     
     # Read the package manifest to determine library type
-    kis_read_package_manifest_json("${package_path}")
+    kis_read_package_manifest_json(PACKAGE_PATH "${package_path}")
     if(NOT DEFINED MANIFEST_TYPE)
         kis_collect_warning("Cannot create imported target for ${package_name}: 'type' not found in manifest")
         return()

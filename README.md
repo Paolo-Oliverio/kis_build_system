@@ -1,97 +1,114 @@
+### **README for the `kis_build_system` (Framework Repository)**
+
 # KIS SDK Build System
 
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE.txt)
 
-This repository contains the centralized CMake build and packaging logic for the **KIS SDK**. It is designed as a modular, versioned, and installable CMake package, providing a single source of truth for building all components within the KIS ecosystem.
+This repository contains the centralized CMake build and packaging logic for the **KIS SDK**. It is a modular, versioned, and installable CMake package that provides a declarative, powerful, and consistent framework for building all components within the KIS ecosystem.
 
-This package provides a powerful suite of CMake functions, not linkable libraries. Its purpose is to be consumed by other KIS packages to ensure they are built, tested, and installed in a consistent, modern, and robust manner.
+This is a **build system framework**, not a linkable library. It is consumed by KIS packages to automate and standardize their entire development lifecycle, from configuration and dependency management to testing and installation.
+
+## Core Philosophy: Declarative & Automated
+
+The KIS SDK build system is architected around a simple principle: **describe your package in a manifest, and the build system will handle the rest.**
+
+A single `kis.package.json` file at the root of your package is the single source of truth. It defines the package's metadata, dependencies, build variants, and platform compatibility. The build system reads this manifest and intelligently generates all the necessary CMake logic, eliminating boilerplate and ensuring consistency across the entire SDK.
 
 ## Key Features
 
-*   **Dual-Mode Architecture**: Seamlessly builds KIS packages either as part of the main `kis_sdk` superbuild or as completely standalone projects.
-*   **Automated Packaging & Installation**: Provides `kis_install_package()` and `kis_install_interface_package()` to standardize the entire installation process, including generating relocatable CMake package configuration files (`<Package>Config.cmake`) and version files.
-*   **Standardized Dependency Helpers**: Offers a consistent API (`kis_handle_dependency`, `kis_link_dependencies`) to declare third-party dependencies that works transparently in both standalone and superbuild modes.
-*   **Consistent Component Tooling**: Simplifies project structure with functions like `kis_add_test`, `kis_add_sample`, and `kis_add_benchmark`, which automatically handle IDE folder organization and build configurations.
-*   **Advanced Asset Management**: Includes a sophisticated asset installation system (`kis_install_assets`) that supports both traditional file copying and a developer-friendly symlinking mode for rapid iteration.
-*   **Self-Contained & Bootstrappable**: Implements a "find-or-fetch" pattern, allowing any standalone package to automatically download these build tools if they aren't already installed, ensuring projects are always buildable with minimal prerequisites.
+*   **Manifest-Driven Configuration**: A simple `kis.package.json` file declares everything the build system needs to know.
+*   **Dual-Mode Architecture**: Seamlessly builds packages as part of the `kis_sdk` **superbuild** or as completely **standalone** projects for isolated development and testing.
 
-## How It Works
+### Advanced Configuration & Specialization
 
-This is not a typical library you link against; it is a build-time dependency that empowers your `CMakeLists.txt`. KIS packages leverage this system in one of two modes:
+*   **Platform Overrides**: The system automatically detects and applies platform-specific source files, headers, and assets from conventional directories (`main/platform/windows/`, `platform_assets/desktop/`). This enables transparent, compile-time specialization without `#ifdef` clutter.
+*   **Package Overrides**: A powerful mechanism allows a platform-specific package (e.g., `kis_packages/windows/kis_renderer`) to completely replace a generic implementation (`kis_packages/kis_renderer`), enabling deeply specialized backends.
+*   **Feature-Based Package Filtering**: Associate packages with features (`"features": ["tools", "editor"]`). The build system will only configure and build packages if their required feature flags are enabled, keeping builds lean and focused.
+*   **ABI-Aware Build Variants**: Define custom, ABI-compatible build types like `profiling` or `asan`. The system manages artifact paths and reuses pre-built dependencies from compatible base variants (`release` or `debug`), dramatically speeding up multi-config workflows.
 
-1.  **Superbuild Mode**: When built within the main KIS SDK, the superbuild includes this package directly. Its functions and settings become globally available to all sub-packages, ensuring total consistency across the entire SDK.
+### Precise & Automated Dependency Management
 
-2.  **Standalone Mode**: When a single KIS package (e.g., `kis_core_utils`) is cloned and built on its own, its `CMakeLists.txt` is responsible for acquiring these build tools. This is achieved through a robust, self-contained mechanism:
+*   **Component Scoping**: Declare dependencies that are only for `tests`, `samples`, or `benchmarks` using the `"scope"` property, preventing them from linking against your main library target.
+*   **Implicit Conditioning**: Scoped dependencies are automatically enabled or disabled based on build flags (`KIS_BUILD_TESTS`, etc.), removing redundant `condition` boilerplate from the manifest.
+*   **Target Mapping**: Explicitly map dependency names (e.g., `glfw3`) to their actual CMake targets (`glfw`) using the `"targets"` property, resolving common integration issues.
+*   **Automated Fetching**: All dependencies (first- and third-party) are automatically fetched via `FetchContent` from Git or URL archives.
 
-    1.  First, it tries to find a pre-installed version on the system via `find_package(kis_build_system)`.
-    2.  If not found, it falls back to using `FetchContent` to clone and include this repository automatically at configure time.
+### Exceptional Developer Experience (DevEx) Tooling
 
-This powerful pattern guarantees that every KIS package is independently buildable, testable, and distributable.
+*   **Automatic Compiler Caching**: Speeds up rebuilds by automatically detecting and enabling `ccache` or `sccache`.
+*   **Incremental Builds**: Smartly re-validates and re-fetches only the packages and dependencies that have actually changed.
+*   **Parallel Dependency Fetching**: Slashes initial configuration time by fetching dependencies concurrently.
+*   **Build Profiling & Graphing**: Provides tools to identify configuration bottlenecks and visualize the project's dependency architecture.
+*   **Standardized Structure & Installation**: A consistent API (`kis_define_package`, `kis_add_test`, `kis_install_package`) enforces a common structure and handles the entire installation process, including generating relocatable CMake package configuration files.
 
-## Usage
+## Usage in a KIS Package
 
-While you can write a package from scratch, the recommended way to create a new KIS package is by using the official `cookiecutter` templates provided in the KIS SDK, as they handle all the boilerplate for you.
+Creating a KIS package is incredibly simple. All the complexity is handled by the build system.
 
-For reference, a typical standalone package's `CMakeLists.txt` includes a block like this to bootstrap the build system:
+**1. Create `kis.package.json`:**
+
+This manifest defines your package, its dependencies, and its behavior.
+
+```json
+{
+  "name": "kis_renderer_gl",
+  "version": "0.1.0",
+  "type": "LIBRARY",
+  "description": "OpenGL rendering backend.",
+  "features": ["renderer"],
+  "overrides": ["kis_renderer_base"],
+  "platform": { "tags": ["desktop"] },
+  "dependencies": {
+    "thirdParty": [
+      {
+        "name": "glad",
+        "git": "...", "tag": "...",
+        "scope": ["main"]
+      },
+      {
+        "name": "doctest",
+        "git": "...", "tag": "...",
+        "scope": ["tests"]
+      }
+    ]
+  }
+}
+```
+
+**2. Create `CMakeLists.txt`:**
+
+The package's CMake script is minimal and declarative.
 
 ```cmake
-# CMakeLists.txt for a new KIS package
-
+# kis_renderer_gl/CMakeLists.txt
 cmake_minimum_required(VERSION 3.20)
+project(kis_renderer_gl)
 
-# --- 1. Bootstrap the Build System (Only for Standalone Builds) ---
-# This block is the key to making a package self-contained. It ensures
-# the KIS build functions are available, either from an installed version
-# or by fetching them from source.
-if(NOT BUILDING_WITH_SUPERBUILD)
-    # Prefer a system-installed version first.
-    find_package(kis_build_system 0.1.0 QUIET)
-
-    if(NOT kis_build_system_FOUND)
-        message(STATUS "kis_build_system not found. Fetching from source...")
-        include(FetchContent)
-        FetchContent_Declare(
-            kis_build_system
-            GIT_REPOSITORY https://github.com/Paolo-Oliverio/kis_build_system.git
-            GIT_TAG        v0.1.0 # Or a specific commit/branch
-        )
-        # This makes the kis_* functions available to this script.
-        FetchContent_MakeAvailable(kis_build_system)
-    endif()
+# This block enables standalone development. It's ignored in a superbuild.
+if(CMAKE_PROJECT_IS_TOP_LEVEL)
+    include(cmake/build_system_bootstrap.cmake)
 endif()
 
-# --- 2. Define the Package ---
-# Load the package manifest (version, name, etc.)
-include(kis.package.cmake)
-project(${PACKAGE_NAME} VERSION ${PACKAGE_VERSION})
+# --- 1. Define the Main Library ---
+# This single command reads the manifest, creates the target, and links
+# all dependencies with 'main' or 'all' scope.
+kis_define_package(
+    SOURCES
+        main/src/renderer.cpp
+)
 
-# Define the library target (INTERFACE for header-only)
-add_library(${PACKAGE_NAME} ...)
-add_library(kis::${PACKAGE_NAME} ALIAS ${PACKAGE_NAME})
-
-# ... target_include_directories, etc. ...
-
-# --- 3. Apply Build Presets and Link Dependencies ---
-# These functions are provided by the build system and adapt their
-# behavior based on whether this is a standalone or superbuild context.
-if(BUILDING_WITH_SUPERBUILD)
-    kis_apply_sdk_build_settings_to_target(${PACKAGE_NAME})
-else()
-    apply_kis_build_presets(${PACKAGE_NAME})
-    # In standalone, linking happens immediately.
-    # In a superbuild, this function call is deferred.
-    ${PACKAGE_NAME}_link_dependencies()
-endif()
-
-# --- 4. Install the Package ---
-# This single command handles all installation and packaging logic.
-kis_install_package()
-
-# --- 5. Add Optional Components ---
+# --- 2. Define Optional Components ---
+# The build system automatically links dependencies with 'tests' scope.
+# No need to manually specify 'doctest' here!
 if(KIS_BUILD_TESTS)
-    kis_add_test(MyTest SOURCES tests/my_test.cpp)
+    kis_add_test(kis_renderer_gl_tests
+        SOURCES
+            tests/renderer.test.cpp
+    )
 endif()
 ```
+
+This simple setup is all that's needed. The build system handles the rest, ensuring it works seamlessly whether you're building this one package by itself or as part of the entire SDK.
 
 ## Contributing
 
@@ -99,4 +116,4 @@ Contributions to the build system should be made with care, as they affect all p
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE.txt) file for details.
+This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.txt) file for details.

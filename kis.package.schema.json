@@ -159,7 +159,23 @@
       "properties": {
         "name": { "type": "string", "pattern": "^[a-zA-Z0-9_]+$" },
         "url": { "type": "string", "format": "uri" },
-        "tag": { "type": "string" }
+        "tag": { "type": "string" },
+        "link": {
+          "description": "Specifies how this dependency should be linked.",
+          "type": "string",
+          "enum": ["PUBLIC", "PRIVATE", "INTERFACE"],
+          "default": "PRIVATE"
+        },
+        "scope": {
+          "description": "Defines which components this dependency is for. Defaults to ['all'].",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["all", "main", "tests", "samples", "benchmarks"]
+          },
+          "default": ["all"],
+          "uniqueItems": true
+        }
       },
       "additionalProperties": false
     },
@@ -185,6 +201,27 @@
         "url": { "description": "Direct download URL for an archive (zip, tar.gz).", "type": "string", "format": "uri" },
         "hash": { "description": "Checksum for the downloaded archive (e.g., 'SHA256=...').", "type": "string" },
         "condition": { "type": "string", "description": "CMake variable that must be ON for this dependency to be included." },
+        "targets": {
+          "description": "Specifies the actual CMake target names provided by the dependency. If omitted, 'name' is used as the target.",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "scope": {
+          "description": "Defines which components this dependency is for. Defaults to ['all'].",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["all", "main", "tests", "samples", "benchmarks"]
+          },
+          "default": ["all"],
+          "uniqueItems": true
+        },
+        "link": {
+          "description": "Specifies how this dependency should be linked.",
+          "type": "string",
+          "enum": ["PUBLIC", "PRIVATE", "INTERFACE"],
+          "default": "PRIVATE"
+        },
         "options": {
             "description": "A list of CMake options to configure the dependency.",
             "type": "array",

@@ -1,6 +1,6 @@
 # kis_build_system/CMakeLists.txt
 
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.22)
 include(kis.package.cmake)
 project(${PACKAGE_NAME} VERSION ${PACKAGE_VERSION})
 
@@ -47,6 +47,11 @@ install(
 if(NOT TARGET kis_build_system_pkg)
     add_library(kis_build_system_pkg INTERFACE)
     add_library(kis::build_system ALIAS kis_build_system_pkg)
+endif()
+
+# 7. Include tests if tests are enabled at the SDK level.
+if(KIS_BUILD_TESTS)
+    add_subdirectory(tests)
 endif()
 
 message(STATUS "Configured kis_build_system package. It provides CMake functions, not libraries.")

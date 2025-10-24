@@ -28,6 +28,11 @@ function(discover_and_map_packages)
     message(STATUS "Discovering packages in search paths: ${search_paths}")
 
     foreach(current_path ${search_paths})
+        # Robustness: Skip search paths that don't actually exist.
+        if(NOT IS_DIRECTORY "${current_path}")
+            continue()
+        endif()
+
         kis_glob_package_directories("${current_path}" discovered_packages)
         
         foreach(full_package_path ${discovered_packages})
@@ -53,7 +58,7 @@ function(discover_and_map_packages)
                 )
             endif()
 
-            kis_read_package_manifest_json("${full_package_path}")
+            kis_read_package_manifest_json(PACKAGE_PATH "${full_package_path}")
 
             if(DEFINED MANIFEST_OVERRIDES)
                 foreach(overridden_pkg ${MANIFEST_OVERRIDES})

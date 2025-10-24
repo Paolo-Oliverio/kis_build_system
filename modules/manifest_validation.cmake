@@ -22,6 +22,11 @@ function(kis_validate_package_manifest package_path)
     endif()
 
     file(READ "${manifest_file}" manifest_content)
+
+    if(KIS_SKIP_MANIFEST_CHECKS)
+        kis_message_verbose("skipped manifest checks of '${pkg_name}' by option full faith in schema validation.")
+        return()
+    endif()
     
     # Validate required fields
     string(JSON pkg_name ERROR_VARIABLE err GET "${manifest_content}" "name")
@@ -86,47 +91,6 @@ function(kis_validate_package_manifest package_path)
                 "Change to:\n     \"type\": \"INTERFACE\",\n     \"abi\": { \"variant\": \"ABI_INVARIANT\" }"
                 PACKAGE "${pkg_name}" FILE "${manifest_file}"
             )
-        endif()
-    endif()
-
-    # Cross-check with CMakeLists.txt if available
-    set(cmakelists_file "${package_path}/CMakeLists.txt")
-    if(EXISTS "${cmakelists_file}")
-        file(READ "${cmakelists_file}" cmakelists_content)
-        
-        set(cmake_declares_interface FALSE)
-        set(cmake_declares_executable FALSE)
-        
-        # More flexible regex patterns that handle ${pkg_name} or literal name
-        if(cmakelists_content MATCHES "add_library\\((\\$\\{PACKAGE_NAME\\}|${pkg_name})[ \\t]+INTERFACE")
-            set(cmake_declares_interface TRUE)
-        endif()
-        
-        if(cmakelists_content MATCHES "add_executable\\((\\$\\{PACKAGE_NAME\\}|${pkg_name})")
-            set(cmake_declares_executable TRUE)
-        endif()
-        
-        # 1. INTERFACE packages MUST use INTERFACE keyword
-        if(pkg_type STREQUAL "INTERFACE" AND NOT cmake_declares_interface)
-            if(cmakelists_content MATCHES "add_library\\((\\$\\{PACKAGE_NAME\\}|${pkg_name})\\)")
-                kis_message_warning_actionable(
-                    "Manifest/CMake Mismatch"
-                    "Manifest declares INTERFACE but CMakeLists.txt missing INTERFACE keyword"
-                    "Fix in ${cmakelists_file}:\n     add_library(\\${PACKAGE_NAME} INTERFACE)  # Add INTERFACE keyword"
-                    PACKAGE "${pkg_name}" FILE "${manifest_file}"
-                )
-            endif()
-        
-        # 2. EXECUTABLE packages MUST use add_executable
-        elseif(pkg_type STREQUAL "EXECUTABLE" AND NOT cmake_declares_executable)
-            if(cmakelists_content MATCHES "add_library\\((\\$\\{PACKAGE_NAME\\}|${pkg_name})")
-                kis_message_warning_actionable(
-                    "Manifest/CMake Mismatch"
-                    "Manifest declares EXECUTABLE but CMakeLists.txt uses add_library"
-                    "Fix in ${cmakelists_file}:\n     add_executable(\\${PACKAGE_NAME} ...)  # Use add_executable instead"
-                    PACKAGE "${pkg_name}" FILE "${manifest_file}"
-                )
-            endif()
         endif()
     endif()
 endfunction()

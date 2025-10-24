@@ -14,6 +14,7 @@ option(KIS_VERBOSE_BUILD "Enable verbose build messages (package imports, linkin
 option(KIS_EXPORT_DEPENDENCY_GRAPH "Export dependency graph to DOT format for visualization" OFF)
 option(KIS_PROFILE_BUILD "Enable build time profiling to identify slow packages" OFF)
 option(KIS_DISABLE_COMPILER_CACHE "Disable automatic compiler cache (ccache/sccache) detection" OFF)
+option(KIS_SKIP_MANIFEST_CHECKS "Skip validation of package manifests (kis.package.json) rely on user schema validation" OFF)
 
 # Incremental validation options
 option(KIS_ENABLE_INCREMENTAL_VALIDATION "Only re-validate packages that have changed" ON)
