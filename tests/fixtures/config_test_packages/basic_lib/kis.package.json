@@ -1,0 +1,7 @@
+{
+    "name": "basic_lib",
+    "version": "1.0.0",
+    "type": "LIBRARY",
+    "description": "A basic library for integration testing.",
+    "features": []
+}

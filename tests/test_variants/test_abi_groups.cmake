@@ -7,10 +7,7 @@ if(NOT COMMAND begin_test_script)
 endif()
 # --- End Test Script Setup ---
 
-# Include the module to test
-include(diagnostics) # Dependency for sdk_variants
-include(sdk_variants)
-
+# All required modules (diagnostics, sdk_variants) are loaded by test_utilities.cmake
 begin_test_script("SDK Variant ABI Logic")
 
 # --- Test Case 1: Get ABI Group ---
@@ -41,14 +38,11 @@ assert_true(${is_compat})
 kis_variants_are_compatible("debug" "asan" is_compat)
 assert_true(${is_compat})
 
-# --- THIS IS THE FIX ---
-# Use the correct assertion helper for checking a false condition.
 kis_variants_are_compatible("release" "debug" is_compat)
 assert_false(${is_compat})
 
 kis_variants_are_compatible("profiling" "asan" is_compat)
 assert_false(${is_compat})
-# --- END OF FIX ---
 
 # --- Test Case 3: Custom Variant Registration ---
 begin_test_case("Register and test a custom variant")

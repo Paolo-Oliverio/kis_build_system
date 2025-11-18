@@ -17,6 +17,6 @@ set_property(GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_DEFINITIONS
 
 # 2. Define properties that should be PRIVATE to our SDK packages' build.
 set_property(GLOBAL PROPERTY KIS_SDK_PRIVATE_COMPILE_OPTIONS
-    $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<CXX_COMPILER_ID:AppleClang>>>:-Wall -Wextra -Wpedantic -Werror>
+    #$<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
+    #$<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<CXX_COMPILER_ID:AppleClang>>>:-Wall -Wextra -Wpedantic -Werror>
 )

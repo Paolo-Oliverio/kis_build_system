@@ -168,7 +168,7 @@ endfunction()
 
 function(kis_install_package)
     kis_read_package_manifest_json()
-    message(STATUS "Installing package: ${MANIFEST_NAME} (v${MANIFEST_VERSION})")
+    kis_message_verbose(STATUS "Installing package: ${MANIFEST_NAME} (v${MANIFEST_VERSION})")
     
     if(DEFINED MANIFEST_CUSTOM_VARIANTS)
         kis_register_package_custom_variants("${MANIFEST_NAME}" "${MANIFEST_CUSTOM_VARIANTS}")

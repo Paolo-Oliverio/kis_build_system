@@ -34,8 +34,6 @@ function(kis_add_platform_specializations)
         return() # No platform specializations in this package.
     endif()
 
-    message(STATUS "Scanning for platform include specializations for target '${ARG_TARGET}'...")
-
     set(reversed_tags ${KIS_PLATFORM_TAGS})
     list(REVERSE reversed_tags)
 

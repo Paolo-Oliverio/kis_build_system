@@ -3,7 +3,7 @@
 
 message(STATUS "Loading SDK build options...")
 
-option(KIS_BUILD_COMPONENTS_IN_ALL "If ON, tests, samples, etc., will be part of the default build target ('all'). If OFF, they must be built explicitly or via CTest." ON)
+option(KIS_BUILD_COMPONENTS_IN_ALL "If ON, tests, samples, etc., will be part of the default build target ('all'). If OFF, they must be built explicitly or via CTest." OFF)
 option(KIS_BUILD_TESTS "Build all test projects." ON)
 option(KIS_BUILD_SAMPLES "Build all sample projects." ON)
 option(KIS_BUILD_BENCHMARKS "Build all benchmark projects." OFF)

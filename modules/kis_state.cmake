@@ -99,7 +99,7 @@ endfunction()
 # ==============================================================================
 function(kis_state_add_tpl_dependency dep_struct)
     set(sep "_KIS_SEP_")
-    # Sanitize the input by replacing newlines with spaces to prevent breaking list parsing.
+    # --- FIX: Sanitize the input to remove newlines before caching ---
     string(REPLACE "\n" " " sanitized_struct "${dep_struct}")
     if(_KIS_CTX_DECLARED_TPL_DEPS)
         set(_KIS_CTX_DECLARED_TPL_DEPS "${_KIS_CTX_DECLARED_TPL_DEPS}${sep}${sanitized_struct}" CACHE INTERNAL "" FORCE)
@@ -130,7 +130,7 @@ endfunction()
 
 function(kis_state_add_kis_dependency dep_json)
     set(sep "_KIS_SEP_")
-    # Sanitize the input by replacing newlines with spaces.
+    # --- FIX: Sanitize the input to remove newlines before caching ---
     string(REPLACE "\n" " " sanitized_json "${dep_json}")
     if(_KIS_CTX_DECLARED_KIS_DEPS)
         set(_KIS_CTX_DECLARED_KIS_DEPS "${_KIS_CTX_DECLARED_KIS_DEPS}${sep}${sanitized_json}" CACHE INTERNAL "" FORCE)

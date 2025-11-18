@@ -187,7 +187,10 @@ function(kis_cache_store_manifest manifest_file)
     
     foreach(var ${manifest_vars})
         if(DEFINED MANIFEST_${var})
-            set("KIS_MANIFEST_CACHE_${fingerprint}_${var}" "${MANIFEST_${var}}" 
+            # --- FIX: Sanitize value before caching to prevent newline warnings ---
+            set(value_to_cache "${MANIFEST_${var}}")
+            string(REPLACE "\n" " " value_to_cache "${value_to_cache}")
+            set("KIS_MANIFEST_CACHE_${fingerprint}_${var}" "${value_to_cache}" 
                 CACHE INTERNAL "Cached ${var} for ${manifest_file}")
         else()
             # Explicitly unset to handle empty values correctly

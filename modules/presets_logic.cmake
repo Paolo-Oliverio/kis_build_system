@@ -35,7 +35,7 @@ endfunction()
 # This function is for SUPERBUILDS. It reads the globally defined SDK settings
 # and applies them to a given package target.
 function(kis_apply_sdk_build_settings_to_target TARGET_NAME)
-    message(STATUS "Applying SDK build settings to ${TARGET_NAME}")
+    kis_message_verbose(STATUS "Applying SDK build settings to ${TARGET_NAME}")
     get_property(public_features GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_FEATURES)
     get_property(public_definitions GLOBAL PROPERTY KIS_SDK_PUBLIC_COMPILE_DEFINITIONS)
     get_property(private_options GLOBAL PROPERTY KIS_SDK_PRIVATE_COMPILE_OPTIONS)

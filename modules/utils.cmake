@@ -250,8 +250,9 @@ function(kis_read_package_manifest_json)
     set(package_root "")
     if(ARG_PACKAGE_PATH)
         set(package_root "${ARG_PACKAGE_PATH}")
-    elseif(DEFINED _KIS_CTX_CURRENT_PACKAGE_ROOT)
-        set(package_root "${_KIS_CTX_CURRENT_PACKAGE_ROOT}")
+    # --- THE CHANGE: Prioritize the explicit context variable ---
+    elseif(DEFINED CACHE{_KIS_CTX_CURRENT_PACKAGE_ROOT})
+        set(package_root "${_KIS_CTX_CURRENT_PACKAGE_ROOT}") # This is now set reliably by the caller
     else()
         set(package_root "${CMAKE_CURRENT_SOURCE_DIR}")
     endif()
@@ -339,16 +340,16 @@ function(kis_read_package_manifest_json)
         unset(MANIFEST_${var} PARENT_SCOPE)
     endforeach()
 
-     message(STATUS "[DEBUG][JSON] Reading manifest from: ${manifest_file}")
+    #message(STATUS "[DEBUG][JSON] Reading manifest from: ${manifest_file}")
 
     string(JSON content_type ERROR_VARIABLE type_err TYPE "${manifest_content}")
     if(type_err)
-        message(STATUS "[DEBUG][JSON] ERROR during initial TYPE check: ${type_err}")
+        #message(STATUS "[DEBUG][JSON] ERROR during initial TYPE check: ${type_err}")
         kis_get_package_name_from_path("${package_root}" pkg_name)
         kis_message_fatal_actionable(
-            "Invalid JSON" 
-            "Manifest content is not valid JSON. Reason: ${type_err}" 
-            "Ensure the file is well-formed JSON."
+            "Invalid JSON in '${manifest_file}'" 
+            "Manifest content is not valid JSON. Reason: ${type_err}\n  File: ${manifest_file}" 
+            "Ensure the file is well-formed JSON. Check for:\n     - Missing braces or brackets\n     - Trailing commas\n     - Invalid escape sequences\n     - BOM or encoding issues"
             PACKAGE ${pkg_name} 
             FILE ${manifest_file}
         )
@@ -356,11 +357,17 @@ function(kis_read_package_manifest_json)
         return() 
     endif()
 
-    message(STATUS "[DEBUG][JSON] Manifest content is valid JSON of type '${content_type}'")
+    #message(STATUS "[DEBUG][JSON] Manifest content is valid JSON of type '${content_type}'")
 
     if(NOT content_type STREQUAL "OBJECT")
         kis_get_package_name_from_path("${package_root}" pkg_name)
-        kis_message_fatal_actionable("Invalid JSON" "Manifest content is not a valid JSON object. Top-level type is '${content_type}'." "Ensure the file starts with '{' and ends with '}'." PACKAGE ${pkg_name} FILE ${manifest_file})
+        kis_message_fatal_actionable(
+            "Invalid JSON in '${manifest_file}'" 
+            "Manifest content is not a valid JSON object. Top-level type is '${content_type}'.\n  File: ${manifest_file}" 
+            "Ensure the file starts with '{' and ends with '}'." 
+            PACKAGE ${pkg_name} 
+            FILE ${manifest_file}
+        )
     else()
         # JSON is valid, proceed with parsing
         string(JSON val ERROR_VARIABLE err GET "${manifest_content}" "name")
@@ -460,10 +467,14 @@ function(kis_read_package_manifest_json)
                 string(JSON val ERROR_VARIABLE err_k GET "${deps_obj}" "kis")
                 if(NOT err_k)
                     _set_manifest_var(KIS_DEPENDENCIES "${val}")
+                    kis_message_verbose("[MANIFEST] Read KIS_DEPENDENCIES: ${val}")
                 endif()
                 string(JSON val ERROR_VARIABLE err_t GET "${deps_obj}" "thirdParty")
                 if(NOT err_t)
                     _set_manifest_var(TPL_DEPENDENCIES "${val}")
+                    kis_message_verbose("[MANIFEST] Read TPL_DEPENDENCIES: ${val}")
+                else()
+                    kis_message_verbose("[MANIFEST] No thirdParty dependencies (error: ${err_t})")
                 endif()
             endif()
         endif()

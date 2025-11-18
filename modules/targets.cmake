@@ -17,19 +17,19 @@ function(_kis_setup_package_target TARGET_NAME)
     if(IS_DIRECTORY "${public_include_dir}")
         # Determine the correct keyword based on the package type.
         if(MANIFEST_TYPE STREQUAL "LIBRARY")
-            message(STATUS "  [${TARGET_NAME}] Adding PUBLIC include: ${public_include_dir}")
+            kis_message_verbose(STATUS "  [${TARGET_NAME}] Adding PUBLIC include: ${public_include_dir}")
             target_include_directories(${TARGET_NAME} PUBLIC
                 $<BUILD_INTERFACE:${public_include_dir}>
                 $<INSTALL_INTERFACE:include>
             )
         elseif(MANIFEST_TYPE STREQUAL "INTERFACE")
-            message(STATUS "  [${TARGET_NAME}] Adding INTERFACE include: ${public_include_dir}")
+            kis_message_verbose(STATUS "  [${TARGET_NAME}] Adding INTERFACE include: ${public_include_dir}")
             target_include_directories(${TARGET_NAME} INTERFACE
                 $<BUILD_INTERFACE:${public_include_dir}>
                 $<INSTALL_INTERFACE:include>
             )
         elseif(MANIFEST_TYPE STREQUAL "EXECUTABLE")
-            message(STATUS "  [${TARGET_NAME}] Adding PRIVATE include: ${public_include_dir}")
+            kis_message_verbose(STATUS "  [${TARGET_NAME}] Adding PRIVATE include: ${public_include_dir}")
             target_include_directories(${TARGET_NAME} PRIVATE
                 "${public_include_dir}"
             )
@@ -77,12 +77,12 @@ function(kis_define_package)
     set(multiValueArgs SOURCES)
     cmake_parse_arguments(ARG "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    # --- REVERTED CHANGE ---
     # This function NO LONGER manages the context. It relies on the context
     # being set by the caller (configure_discovered_packages).
     
     # Read the manifest to get the package's name and type.
-    # It will now use the context variable set by the superbuild loop.
+    # This call now reliably finds the correct manifest because the context
+    # variable _KIS_CTX_CURRENT_PACKAGE_ROOT was set by the calling loop.
     kis_read_package_manifest_json()
 
     if(NOT DEFINED MANIFEST_NAME OR NOT DEFINED MANIFEST_TYPE)
@@ -109,9 +109,6 @@ function(kis_define_package)
 
     # Apply all the standard boilerplate setup to the new target.
     _kis_setup_package_target(${MANIFEST_NAME})
-    
-    # --- REVERTED CHANGE ---
-    # The unset() call is removed.
 endfunction()
 
 
@@ -166,7 +163,7 @@ function(kis_add_library)
             endif()
         endforeach()
     endforeach()
-    message(STATUS "Creating library '${ARG_TARGET}' with resolved sources.")
+    kis_message_verbose(STATUS "Creating library '${ARG_TARGET}' with resolved sources.")
     add_library(${ARG_TARGET} ${final_source_list})
     add_library(kis::${ARG_TARGET} ALIAS ${ARG_TARGET})
     if(KIS_CONFIG_SUFFIX STREQUAL "debug")

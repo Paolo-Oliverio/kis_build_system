@@ -1,5 +1,23 @@
 # cmake/build_system/package_configuration.cmake
 
+#
+# _kis_create_skipped_package_stub (INTERNAL)
+#
+# Creates a dummy INTERFACE target for a package that is being skipped.
+# This prevents link errors in packages that may still depend on it.
+# This function is mocked during testing.
+#
+function(_kis_create_skipped_package_stub package_name)
+    if(NOT TARGET ${package_name})
+        add_library(${package_name} INTERFACE IMPORTED GLOBAL)
+        message(STATUS "  -> Created stub target for skipped package: ${package_name}")
+    endif()
+    if(NOT TARGET kis::${package_name})
+        add_library(kis::${package_name} ALIAS ${package_name})
+    endif()
+endfunction()
+
+
 # ==============================================================================
 #           PHASE 1: PACKAGE CONFIGURATION
 # ==============================================================================
@@ -24,9 +42,10 @@ function(configure_discovered_packages)
         
         kis_read_package_manifest_json(PACKAGE_PATH "${package_path}")
         
-        # ... (all the logic for should_build/should_import is unchanged) ...
-        if(DEFINED MANIFEST_FEATURES)
-            set(should_build FALSE)
+        # A package should only be built if its feature requirements are met.
+        # An empty "features" list means it has no requirements and should always be considered.
+        if(DEFINED MANIFEST_FEATURES AND NOT "${MANIFEST_FEATURES}" STREQUAL "")
+            set(should_build FALSE) # Assume skip, unless a feature matches
             foreach(required_feature ${MANIFEST_FEATURES})
                 if(required_feature IN_LIST KIS_ACTIVE_FEATURES)
                     set(should_build TRUE)
@@ -34,9 +53,10 @@ function(configure_discovered_packages)
                 endif()
             endforeach()
             if(NOT should_build)
-                set(skip_reason "requires features [${MANIFEST_FEATURES}], active: [${KIS_ACTIVE_FEATURES}]")
+                set(skip_reason "requires one of features [${MANIFEST_FEATURES}], but active features are [${KIS_ACTIVE_FEATURES}]")
             endif()
         endif()
+
         if(NOT DEFINED MANIFEST_ABI_VARIANT)
             set(MANIFEST_ABI_VARIANT "PER_CONFIG")
         endif()
@@ -69,9 +89,9 @@ function(configure_discovered_packages)
         
         if(should_build)
             # Add KIS dependencies to the central state, respecting implicit conditions
-            if(DEFINED MANIFEST_KIS_DEPENDENCIES)
-                string(JSON num_deps LENGTH "${MANIFEST_KIS_DEPENDENCIES}")
-                if(num_deps GREATER 0)
+            if(DEFINED MANIFEST_KIS_DEPENDENCIES AND MANIFEST_KIS_DEPENDENCIES)
+                string(JSON num_deps ERROR_VARIABLE err LENGTH "${MANIFEST_KIS_DEPENDENCIES}")
+                if(NOT err AND num_deps GREATER 0)
                     math(EXPR last_idx "${num_deps} - 1")
                     foreach(i RANGE ${last_idx})
                         string(JSON dep_obj GET "${MANIFEST_KIS_DEPENDENCIES}" ${i})
@@ -107,7 +127,7 @@ function(configure_discovered_packages)
                 endif()
             endif()
             # Handle TPL dependencies using the refactored function which also has implicit conditions
-            if(DEFINED MANIFEST_TPL_DEPENDENCIES)
+            if(DEFINED MANIFEST_TPL_DEPENDENCIES AND MANIFEST_TPL_DEPENDENCIES)
                 kis_handle_third_party_dependencies("${package_name}" "${MANIFEST_TPL_DEPENDENCIES}")
             endif()
         endif()
@@ -119,20 +139,14 @@ function(configure_discovered_packages)
                 _kis_create_imported_package_target("${package_name}" "${package_path}" "${base_variant}")
             else()
                 kis_message_verbose("Skipping package '${package_name}': ${skip_reason}")
-                if(NOT TARGET ${package_name})
-                    add_library(${package_name} INTERFACE IMPORTED GLOBAL)
-                    message(STATUS "  -> Created stub target for skipped package: ${package_name}")
-                endif()
-                if(NOT TARGET kis::${package_name})
-                    add_library(kis::${package_name} ALIAS ${package_name})
-                endif()
+                # THE FIX: Call the new helper function which can be mocked.
+                _kis_create_skipped_package_stub(${package_name})
             endif()
         else()
-            message(STATUS "Configuring package: ${package_name}")
             kis_profile_begin("${package_name}" "configure")
             if(DEFINED MANIFEST_TYPE)
                 set(pkg_platform "common")
-                if(DEFINED MANIFEST_PLATFORMS) 
+                if(DEFINED MANIFEST_PLATFORMS AND MANIFEST_PLATFORMS) 
                     list(GET MANIFEST_PLATFORMS 0 pkg_platform) 
                 endif()
                 kis_graph_add_node("${package_name}" "${MANIFEST_TYPE}" "${pkg_platform}")
@@ -140,10 +154,11 @@ function(configure_discovered_packages)
             set(source_dir ${package_path})
             set(binary_dir "${CMAKE_BINARY_DIR}/_deps/${package_name}-build")
 
-            # --- THE FIX: Create the context sandwich around add_subdirectory ---
-            set(_KIS_CTX_CURRENT_PACKAGE_ROOT "${package_path}") # Set context
+            # --- THE CHANGE: Create the context sandwich around add_subdirectory ---
+            set(_KIS_CTX_CURRENT_PACKAGE_ROOT "${package_path}" CACHE INTERNAL "Active package context for add_subdirectory")
             add_subdirectory(${source_dir} ${binary_dir})
-            unset(_KIS_CTX_CURRENT_PACKAGE_ROOT) # Unset context
+            # Unset the context variable to keep state clean for the next package.
+            unset(_KIS_CTX_CURRENT_PACKAGE_ROOT CACHE)
 
             kis_profile_end("${package_name}" "configure")
         endif()
